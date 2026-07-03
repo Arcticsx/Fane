@@ -11,7 +11,7 @@ try:
 except ImportError:
     from database import get_db
     from models import SourceDocument
-    from services.document_processor import process_document
+    from services.process_documents import process_document
 
 router = APIRouter(prefix="/story", tags=["documents"])
 
