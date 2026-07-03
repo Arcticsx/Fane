@@ -40,6 +40,15 @@ export default function EditModal({ open, initialData, onSave, onCancel, saving 
     setErrors({});
   }, [initialData, open]);
 
+  useEffect(() => {
+    if (!open) return;
+    const onKey = (e) => {
+      if (e.key === 'Escape') onCancel && onCancel();
+    };
+    window.addEventListener('keydown', onKey);
+    return () => window.removeEventListener('keydown', onKey);
+  }, [open, onCancel]);
+
   if (!open) return null;
 
   const validate = () => {
@@ -79,8 +88,8 @@ export default function EditModal({ open, initialData, onSave, onCancel, saving 
   };
 
   return (
-    <div className="fixed inset-0 z-[9998] flex items-center justify-center bg-black/70 p-4">
-      <div className="w-full max-w-2xl max-h-[90vh] rounded-3xl border border-border/60 bg-surface/90 shadow-2xl shadow-black/50 backdrop-blur-xl flex flex-col">
+    <div className="fixed inset-0 z-[9998] flex items-center justify-center bg-bg/70 p-4">
+      <div className="w-full max-w-2xl max-h-[90vh] rounded-3xl border border-border/60 bg-surface/90 shadow-2xl shadow-surface/40 backdrop-blur-xl flex flex-col">
         {/* Fixed header */}
         <div className="flex-shrink-0 px-6 pt-6 pb-2">
           <h3 className="text-xl font-semibold text-text">
@@ -91,20 +100,20 @@ export default function EditModal({ open, initialData, onSave, onCancel, saving 
         {/* Scrollable form body */}
         <form onSubmit={handleSubmit} className="flex-1 overflow-y-auto px-6 py-4 space-y-3">
           <div>
-            <label className="mb-1 block text-sm font-medium text-slate-300">Name</label>
+            <label className="mb-1 block text-sm font-medium text-muted">Name</label>
             <input
-              className="w-full rounded-xl border border-border/60 bg-[#1a0a2e] px-3 py-2 text-sm text-white placeholder:text-muted outline-none transition focus:border-accent"
+              className="w-full rounded-xl border border-border/60 bg-surface px-3 py-2 text-sm text-text placeholder:text-muted outline-none transition focus:border-accent"
               value={form.name}
               onChange={(e) => handleChange('name', e.target.value)}
               placeholder="Enter personality name"
             />
-            {errors.name && <div className="mt-1 text-sm text-rose-200">{errors.name}</div>}
+            {errors.name && <div className="mt-1 text-sm text-accent">{errors.name}</div>}
           </div>
 
           <div>
-            <label className="mb-1 block text-sm font-medium text-slate-300">Description</label>
+            <label className="mb-1 block text-sm font-medium text-muted">Description</label>
             <textarea
-              className="min-h-[80px] max-h-48 overflow-y-auto w-full rounded-xl border border-border/60 bg-[#1a0a2e] px-3 py-2 text-sm text-white placeholder:text-muted outline-none transition focus:border-accent"
+              className="min-h-[80px] max-h-48 overflow-y-auto w-full rounded-xl border border-border/60 bg-surface px-3 py-2 text-sm text-text placeholder:text-muted outline-none transition focus:border-accent"
               value={form.description}
               onChange={(e) => handleChange('description', e.target.value)}
               placeholder="Brief description"
@@ -112,20 +121,20 @@ export default function EditModal({ open, initialData, onSave, onCancel, saving 
           </div>
 
           <div>
-            <label className="mb-1 block text-sm font-medium text-slate-300">Personality</label>
+            <label className="mb-1 block text-sm font-medium text-muted">Personality</label>
             <textarea
-              className="min-h-[100px] max-h-48 overflow-y-auto w-full rounded-xl border border-border/60 bg-[#1a0a2e] px-3 py-2 text-sm text-white placeholder:text-muted outline-none transition focus:border-accent"
+              className="min-h-[100px] max-h-48 overflow-y-auto w-full rounded-xl border border-border/60 bg-surface px-3 py-2 text-sm text-text placeholder:text-muted outline-none transition focus:border-accent"
               value={form.system}
               onChange={(e) => handleChange('system', e.target.value)}
               placeholder="Define the system behavior"
             />
-            {errors.system && <div className="mt-1 text-sm text-rose-200">{errors.system}</div>}
+            {errors.system && <div className="mt-1 text-sm text-accent">{errors.system}</div>}
           </div>
 
           <div>
-            <label className="mb-1 block text-sm font-medium text-slate-300">Base Prompt / Scenario</label>
+            <label className="mb-1 block text-sm font-medium text-muted">Base Prompt / Scenario</label>
             <textarea
-              className="min-h-[90px] max-h-48 overflow-y-auto w-full rounded-xl border border-border/60 bg-[#1a0a2e] px-3 py-2 text-sm text-white placeholder:text-muted outline-none transition focus:border-accent"
+              className="min-h-[90px] max-h-48 overflow-y-auto w-full rounded-xl border border-border/60 bg-surface px-3 py-2 text-sm text-text placeholder:text-muted outline-none transition focus:border-accent"
               value={form.scenario}
               onChange={(e) => handleChange('scenario', e.target.value)}
               placeholder="Scenario or context"
@@ -133,9 +142,9 @@ export default function EditModal({ open, initialData, onSave, onCancel, saving 
           </div>
 
           <div>
-            <label className="mb-1 block text-sm font-medium text-slate-300">Opening Prompt</label>
+            <label className="mb-1 block text-sm font-medium text-muted">Opening Prompt</label>
             <textarea
-              className="min-h-[90px] max-h-48 overflow-y-auto w-full rounded-xl border border-border/60 bg-[#1a0a2e] px-3 py-2 text-sm text-white placeholder:text-muted outline-none transition focus:border-accent"
+              className="min-h-[90px] max-h-48 overflow-y-auto w-full rounded-xl border border-border/60 bg-surface px-3 py-2 text-sm text-text placeholder:text-muted outline-none transition focus:border-accent"
               value={form.opening_prompt}
               onChange={(e) => handleChange('opening_prompt', e.target.value)}
               placeholder="Initial assistant message"
@@ -143,7 +152,7 @@ export default function EditModal({ open, initialData, onSave, onCancel, saving 
           </div>
 
           <div>
-            <label className="mb-1 block text-sm font-medium text-slate-300">Avatar Image</label>
+            <label className="mb-1 block text-sm font-medium text-muted">Avatar Image</label>
             <div className="relative">
               <input
                 type="file"
@@ -154,7 +163,7 @@ export default function EditModal({ open, initialData, onSave, onCancel, saving 
               />
               <label
                 htmlFor="avatar-upload"
-                className="inline-flex w-full cursor-pointer items-center justify-center rounded-xl border border-border/60 bg-[#1a0a2e] px-4 py-2.5 text-sm text-slate-300 transition hover:border-accent hover:bg-[#2a1a3e]"
+                className="inline-flex w-full cursor-pointer items-center justify-center rounded-xl border border-border/60 bg-surface/80 px-4 py-2.5 text-sm text-muted transition hover:border-accent hover:bg-surface/70"
               >
                 <svg className="mr-2 h-5 w-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                   <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 16l4.586-4.586a2 2 0 012.828 0L16 16m-2-2l1.586-1.586a2 2 0 012.828 0L20 14m-6-6h.01M6 20h12a2 2 0 002-2V6a2 2 0 00-2-2H6a2 2 0 00-2 2v12a2 2 0 002 2z" />
@@ -174,7 +183,7 @@ export default function EditModal({ open, initialData, onSave, onCancel, saving 
         <div className="flex-shrink-0 px-6 pb-6 pt-2 flex justify-end gap-2">
           <button
             type="button"
-            className="rounded-lg bg-white/10 px-3 py-2 text-sm text-slate-300 transition hover:bg-white/15"
+            className="rounded-lg bg-surface/80 px-3 py-2 text-sm text-text transition hover:bg-surface/70"
             onClick={onCancel}
             disabled={saving}
           >
@@ -182,7 +191,7 @@ export default function EditModal({ open, initialData, onSave, onCancel, saving 
           </button>
           <button
             type="submit"
-            className="rounded-lg bg-gradient-to-r from-accent to-accent2 px-3 py-2 text-sm font-semibold text-slate-950 transition hover:-translate-y-0.5"
+            className="rounded-lg bg-gradient-to-r from-accent to-accent2 px-3 py-2 text-sm font-semibold text-text transition hover:-translate-y-0.5"
             onClick={handleSubmit}
             disabled={saving}
           >

@@ -73,15 +73,15 @@ button {
 }
 
 ::-webkit-scrollbar-thumb {
-  background: #7c3aed;   /* purple-600 */
+  background: var(--color-accent);
   border-radius: 3px;
 }
 
 ::-webkit-scrollbar-thumb:hover {
-  background: #a78bfa;   /* purple-400 */
+  background: var(--color-accent-2);
 }
 
 * {
   scrollbar-width: thin;
-  scrollbar-color: #7c3aed transparent;
+  scrollbar-color: var(--color-accent) transparent;
 }

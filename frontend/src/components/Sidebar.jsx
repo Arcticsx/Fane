@@ -163,7 +163,7 @@ function Sidebar({ activeView, onViewChange, onCreateClick }) {
               className={`relative flex items-center gap-3 rounded-xl px-3 py-2.5 text-left text-sm font-medium transition-all duration-200 ${
                 isActive
                   ? 'bg-accent/10 text-accent shadow-[inset_0_1px_0_rgba(255,255,255,0.1)]'
-                  : 'text-muted hover:bg-white/5 hover:text-white'
+                  : 'text-muted hover:bg-surface/80 hover:text-text'
               }`}
             >
               {isActive && (
@@ -229,7 +229,7 @@ function Sidebar({ activeView, onViewChange, onCreateClick }) {
                 className={`relative flex items-center gap-2.5 rounded-xl px-3 py-2.5 text-left transition-all duration-200 ${
                   isActive
                     ? 'bg-accent/10 shadow-[inset_0_1px_0_rgba(255,255,255,0.1)]'
-                    : 'hover:bg-white/5'
+                    : 'hover:bg-surface/80'
                 }`}
               >
                 {isActive && (
@@ -248,7 +248,7 @@ function Sidebar({ activeView, onViewChange, onCreateClick }) {
                       className="h-full w-full object-cover"
                     />
                   ) : (
-                    <div className="flex h-full w-full items-center justify-center text-sm font-semibold text-slate-950">
+                    <div className="flex h-full w-full items-center justify-center text-sm font-semibold text-text">
                       {session.persona_name?.charAt(
                         0
                       )}

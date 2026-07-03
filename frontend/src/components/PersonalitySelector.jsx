@@ -3,11 +3,27 @@ import { api, getImageUrl } from '../api';
 import ConfirmModal from './ConfirmModal.jsx';
 import EditModal from './EditModal.jsx';
 import Sidebar from './Sidebar.jsx';
+import ThemeSelector from './ThemeSelector.jsx';
+import ThemeModal from './ThemeModal.jsx';
 
-function PersonalitySelector({ onPersonaSelected }) {
+function PersonalitySelector({
+  onPersonaSelected,
+  selectedThemeId,
+  customBackgroundUrl,
+  onSelectTheme,
+  onUploadBackground,
+  onClearCustomBackground,
+  onCreateCustomTheme,
+  themes,
+  onHoverPreview,
+  onHoverPreviewEnd,
+  onDeleteTheme,
+  onUpdateTheme,
+}) {
   const [personalities, setPersonalities] = useState({});
   const [editingPersonaKey, setEditingPersonaKey] = useState(null);
   const [editModalOpen, setEditModalOpen] = useState(false);
+  const [themeModalOpen, setThemeModalOpen] = useState(false);
   const [modalInitialData, setModalInitialData] = useState(null);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
@@ -116,7 +132,7 @@ function PersonalitySelector({ onPersonaSelected }) {
   });
 
   return (
-    <div className="flex h-screen bg-bg text-text">
+    <div className="flex h-screen text-text">
       <Sidebar
         activeView={activeView}
         onViewChange={setActiveView}
@@ -139,26 +155,34 @@ function PersonalitySelector({ onPersonaSelected }) {
             />
             <span className="material-symbols-outlined px-3 text-muted transition group-focus-within:text-accent">search</span>
           </div>
-          <button
-            className="rounded-full bg-accent px-4 py-2 text-sm font-semibold text-slate-950 transition hover:-translate-y-0.5"
-            onClick={() => {
-              setEditingPersonaKey(null);
-              setModalInitialData(null);
-              setEditModalOpen(true);
-            }}
-          >
-            + Create New
-          </button>
+          <div className="flex flex-wrap items-center gap-3">
+            <button
+              className="rounded-full bg-surface/80 px-4 py-2 text-sm font-semibold text-text transition hover:bg-surface/70"
+              onClick={() => setThemeModalOpen(true)}
+            >
+              Theme
+            </button>
+            <button
+              className="rounded-full bg-accent px-4 py-2 text-sm font-semibold text-text transition hover:-translate-y-0.5"
+              onClick={() => {
+                setEditingPersonaKey(null);
+                setModalInitialData(null);
+                setEditModalOpen(true);
+              }}
+            >
+              + Create New
+            </button>
+          </div>
         </header>
 
-        {error && <div className="mb-3 rounded-xl border border-rose-400/40 bg-rose-500/10 px-4 py-3 text-sm text-rose-200">{error}</div>}
-        {toast && <div className="mb-3 rounded-xl border border-emerald-400/40 bg-emerald-500/10 px-4 py-3 text-sm text-emerald-200">{toast}</div>}
+        {error && <div className="mb-3 rounded-xl border border-accent/40 bg-accent/10 px-4 py-3 text-sm text-accent">{error}</div>}
+        {toast && <div className="mb-3 rounded-xl border border-accent2/40 bg-accent2/10 px-4 py-3 text-sm text-accent2">{toast}</div>}
 
         <section className="flex-1 overflow-y-auto pr-1">
           {loading ? (
             <div className="py-20 text-center text-muted">Loading personalities…</div>
           ) : filteredList.length === 0 ? (
-            <div className="rounded-2xl border border-border/60 bg-white/5 px-6 py-16 text-center text-muted">
+            <div className="rounded-2xl border border-border/60 bg-surface/80 px-6 py-16 text-center text-muted">
               <p>No personalities found. Create one to get started.</p>
             </div>
           ) : (
@@ -170,7 +194,7 @@ function PersonalitySelector({ onPersonaSelected }) {
                   {filteredList.map((persona) => (
                     <div
                       key={persona.key}
-                      className="group relative flex items-center gap-4 cursor-pointer rounded-2xl border border-border/60 bg-surface/70 p-4 shadow-lg shadow-black/20 transition hover:-translate-y-1 hover:border-accent/40 h-32 overflow-hidden"
+                      className="group relative flex items-center gap-4 cursor-pointer rounded-2xl border border-border/60 bg-surface/70 p-4 shadow-lg shadow-surface/20 transition hover:-translate-y-1 hover:border-accent/40 h-32 overflow-hidden"
                       onClick={() => handlePersonaClick(persona)}
                     >
                       {/* Square avatar */}
@@ -182,7 +206,7 @@ function PersonalitySelector({ onPersonaSelected }) {
                             className="h-full w-full object-cover"
                           />
                         ) : (
-                          <div className="flex h-full w-full items-center justify-center text-2xl font-semibold text-slate-950">
+                          <div className="flex h-full w-full items-center justify-center text-2xl font-semibold text-text">
                             {persona.name.charAt(0)}
                           </div>
                         )}
@@ -192,7 +216,7 @@ function PersonalitySelector({ onPersonaSelected }) {
                       <div className="flex h-24 flex-1 flex-col justify-between overflow-hidden">
                         <div className="min-h-0 flex-1">
                           <h3 className="text-base font-semibold text-text truncate">{persona.name}</h3>
-                          <p className="mt-1 text-sm text-slate-300 line-clamp-2 break-words">
+                          <p className="mt-1 text-sm text-muted line-clamp-2 break-words">
                             {persona.description || "No description"}
                           </p>
                         </div>
@@ -200,14 +224,14 @@ function PersonalitySelector({ onPersonaSelected }) {
                         {/* Edit/Delete buttons */}
                         <div className="flex justify-end gap-2 opacity-0 transition group-hover:opacity-100">
                           <button
-                            className="rounded-lg bg-white/10 px-3 py-1.5 text-sm text-slate-300 hover:bg-emerald-500/15 hover:text-emerald-200"
+                            className="rounded-lg bg-surface/80 px-3 py-1.5 text-sm text-text hover:bg-accent/15 hover:text-accent"
                             onClick={(e) => handleEditPersona(e, persona)}
                             title="Edit"
                           >
                             <span className="material-symbols-outlined text-base">edit</span>
                           </button>
                           <button
-                            className="rounded-lg bg-white/10 px-3 py-1.5 text-sm text-slate-300 hover:bg-rose-500/15 hover:text-rose-200"
+                            className="rounded-lg bg-surface/80 px-3 py-1.5 text-sm text-text hover:bg-accent2/15 hover:text-accent2"
                             onClick={(e) => handleDeletePersona(e, persona)}
                             title="Delete"
                           >
@@ -223,6 +247,22 @@ function PersonalitySelector({ onPersonaSelected }) {
           )}
         </section>
       </main>
+
+      <ThemeModal open={themeModalOpen} onClose={() => setThemeModalOpen(false)}>
+        <ThemeSelector
+          themes={themes}
+          selectedThemeId={selectedThemeId}
+          customBackgroundUrl={customBackgroundUrl}
+          onSelectTheme={onSelectTheme}
+          onUploadBackground={onUploadBackground}
+          onClearCustomBackground={onClearCustomBackground}
+          onCreateCustomTheme={onCreateCustomTheme}
+          onHoverPreview={onHoverPreview}
+          onHoverPreviewEnd={onHoverPreviewEnd}
+          onDeleteTheme={onDeleteTheme}
+            onUpdateTheme={onUpdateTheme}
+        />
+      </ThemeModal>
 
       <EditModal
         open={editModalOpen}

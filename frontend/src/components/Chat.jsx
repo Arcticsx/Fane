@@ -131,7 +131,7 @@ function Chat({ persona: propPersona, session: propSession, onBack }) {
 
   if (loadingPersona) {
     return (
-      <div className="flex min-h-screen items-center justify-center bg-bg text-text">
+      <div className="flex min-h-screen items-center justify-center text-text">
         <p className="text-muted">Loading personality…</p>
       </div>
     );
@@ -139,15 +139,15 @@ function Chat({ persona: propPersona, session: propSession, onBack }) {
 
   if (!persona) {
     return (
-      <div className="flex min-h-screen items-center justify-center bg-bg text-text text-rose-400">
-        <p>Personality not found.</p>
+      <div className="flex min-h-screen items-center justify-center text-text">
+        <p className="text-muted">Personality not found.</p>
       </div>
     );
   }
 
   if (initializing) {
     return (
-      <div className="flex min-h-screen items-center justify-center bg-bg text-text">
+      <div className="flex min-h-screen items-center justify-center text-text">
         <p className="text-muted">Loading chat...</p>
       </div>
     );
@@ -163,21 +163,21 @@ function Chat({ persona: propPersona, session: propSession, onBack }) {
           background: transparent;
         }
         .scrollbar-themed::-webkit-scrollbar-thumb {
-          background: #7c3aed;
+          background: var(--color-accent);
           border-radius: 3px;
         }
         .scrollbar-themed::-webkit-scrollbar-thumb:hover {
-          background: #a78bfa;
+          background: var(--color-accent-2);
         }
         .scrollbar-themed {
           scrollbar-width: thin;
-          scrollbar-color: #7c3aed transparent;
+          scrollbar-color: var(--color-accent) transparent;
         }
       `}</style>
 
       <div className="mx-auto flex h-full max-w-5xl flex-col px-4 py-4 sm:px-6 lg:px-8">
         {/* Redesigned Header */}
-        <div className="mb-4 flex items-center justify-between rounded-2xl border border-border/60 bg-surface/70 px-4 py-3 shadow-lg shadow-black/20">
+        <div className="mb-4 flex items-center justify-between rounded-2xl border border-border/60 bg-surface/70 px-4 py-3 shadow-lg shadow-surface/20">
           <div className="flex items-center gap-3">
             {/* Avatar */}
             <div className="h-10 w-10 shrink-0 overflow-hidden rounded-full bg-gradient-to-br from-accent2 to-accent">
@@ -188,7 +188,7 @@ function Chat({ persona: propPersona, session: propSession, onBack }) {
                   className="h-full w-full object-cover"
                 />
               ) : (
-                <div className="flex h-full w-full items-center justify-center text-sm font-semibold text-slate-950">
+                <div className="flex h-full w-full items-center justify-center text-sm font-semibold text-text">
                   {persona.name.charAt(0)}
                 </div>
               )}
@@ -205,7 +205,7 @@ function Chat({ persona: propPersona, session: propSession, onBack }) {
           <div className="flex items-center gap-2">
             <button
               onClick={handleNewChat}
-              className="flex items-center gap-1 rounded-full bg-accent/20 px-3 py-1.5 text-sm font-medium text-accent transition hover:bg-accent/30 hover:text-white"
+              className="flex items-center gap-1 rounded-full bg-accent/20 px-3 py-1.5 text-sm font-medium text-accent transition hover:bg-accent/30 hover:text-text"
               title="Start a new chat with this persona"
             >
               <PlusIcon size={16} />
@@ -213,7 +213,7 @@ function Chat({ persona: propPersona, session: propSession, onBack }) {
             </button>
             <button
               onClick={onBack}
-              className="rounded-full bg-white/10 px-3 py-1.5 text-sm text-muted transition hover:bg-white/20 hover:text-white"
+              className="rounded-full bg-surface/80 px-3 py-1.5 text-sm text-muted transition hover:bg-surface/70 hover:text-text"
             >
               ← Back
             </button>
@@ -221,7 +221,7 @@ function Chat({ persona: propPersona, session: propSession, onBack }) {
         </div>
 
         {/* Messages area */}
-        <div className="scrollbar-themed mb-4 flex-1 overflow-y-auto rounded-2xl border border-border/50 bg-surface/60 p-4 shadow-inner shadow-black/20">
+        <div className="scrollbar-themed mb-4 flex-1 overflow-y-auto rounded-2xl border border-border/50 bg-surface/60 p-4 shadow-inner shadow-surface/20">
           <div className="flex flex-col gap-4">
             {messages.map((msg, index) => {
               if (msg.role === 'system') return null;
@@ -229,16 +229,16 @@ function Chat({ persona: propPersona, session: propSession, onBack }) {
               const roleLabel = isUser ? 'You' : persona.name;
 
               return (
-                <div key={index} className={`max-w-[80%] rounded-2xl px-4 py-3 text-sm leading-7 ${isUser ? 'ml-auto bg-emerald-500/15 text-white' : 'bg-white/5 text-slate-200'}`}>
-                  <div className={`mb-1 text-[11px] font-semibold uppercase tracking-[0.2em] ${isUser ? 'text-sky-300' : 'text-emerald-200'}`}>{roleLabel}</div>
+                <div key={index} className={`max-w-[80%] rounded-2xl px-4 py-3 text-sm leading-7 ${isUser ? 'ml-auto bg-accent/15 text-text' : 'bg-surface/80 text-text'}`}>
+                  <div className={`mb-1 text-[11px] font-semibold uppercase tracking-[0.2em] ${isUser ? 'text-accent' : 'text-muted'}`}>{roleLabel}</div>
                   <div className="whitespace-pre-wrap">{msg.content}</div>
                 </div>
               );
             })}
 
             {loading && (
-              <div className="max-w-[80%] rounded-2xl bg-white/5 px-4 py-3 text-sm leading-7 text-slate-200">
-                <div className="mb-1 text-[11px] font-semibold uppercase tracking-[0.2em] text-emerald-200">{persona.name}</div>
+              <div className="max-w-[80%] rounded-2xl bg-surface/80 px-4 py-3 text-sm leading-7 text-text">
+                <div className="mb-1 text-[11px] font-semibold uppercase tracking-[0.2em] text-accent">{persona.name}</div>
                 <div className="animate-pulse text-muted">…</div>
               </div>
             )}
@@ -247,7 +247,7 @@ function Chat({ persona: propPersona, session: propSession, onBack }) {
         </div>
 
         {/* Input */}
-        <form onSubmit={handleSendMessage} className="flex items-end gap-2 rounded-2xl border border-border/40 bg-surface/70 p-3 shadow-lg shadow-black/20">
+        <form onSubmit={handleSendMessage} className="flex items-end gap-2 rounded-2xl border border-border/40 bg-surface/70 p-3 shadow-lg shadow-surface/20">
           <textarea
             ref={textareaRef}
             rows={1}
@@ -262,7 +262,7 @@ function Chat({ persona: propPersona, session: propSession, onBack }) {
           <button
             type={loading ? 'button' : 'submit'}
             disabled={loading || !input.trim()}
-            className="shrink-0 rounded-full border border-border/40 p-1.5 text-white transition hover:-translate-y-0.5 disabled:cursor-not-allowed disabled:opacity-50"
+            className="shrink-0 rounded-full border border-border/40 p-1.5 text-text transition hover:-translate-y-0.5 disabled:cursor-not-allowed disabled:opacity-50"
           >
             {loading ? (
               <svg

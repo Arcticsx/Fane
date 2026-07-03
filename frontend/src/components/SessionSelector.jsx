@@ -83,7 +83,7 @@ function SessionSelector({ persona, onSessionSelected, onBack }) {
   const sortedGroups = ['Today', 'Yesterday', 'Older'].filter((g) => grouped[g]);
 
   return (
-    <div className="flex flex-1 flex-col overflow-hidden px-6 py-6 bg-bg text-text">
+    <div className="flex flex-1 flex-col overflow-hidden px-6 py-6 text-text">
       <header className="mb-5 flex flex-wrap items-center justify-between gap-3">
         <h1 className="text-2xl font-semibold text-text flex items-center gap-2">
           <span className="material-symbols-outlined text-3xl text-accent">chat</span>
@@ -104,7 +104,7 @@ function SessionSelector({ persona, onSessionSelected, onBack }) {
           </div>
 
           <button
-            className="flex items-center gap-1.5 rounded-full bg-gradient-to-r from-accent to-accent2 px-4 py-2 text-sm font-semibold text-slate-950 shadow-lg shadow-accent/20 transition hover:-translate-y-0.5"
+            className="flex items-center gap-1.5 rounded-full bg-gradient-to-r from-accent to-accent2 px-4 py-2 text-sm font-semibold text-text shadow-lg shadow-accent/20 transition hover:-translate-y-0.5"
             onClick={handleNewSession}
           >
             <span className="material-symbols-outlined text-base">add</span>
@@ -124,7 +124,7 @@ function SessionSelector({ persona, onSessionSelected, onBack }) {
               Start your first chat with <strong>{persona.name}</strong>
             </p>
             <button
-              className="mt-6 flex items-center gap-2 rounded-full bg-gradient-to-r from-accent to-accent2 px-6 py-3 text-sm font-semibold text-slate-950 shadow-lg shadow-accent/30 transition hover:scale-105"
+              className="mt-6 flex items-center gap-2 rounded-full bg-gradient-to-r from-accent to-accent2 px-6 py-3 text-sm font-semibold text-text shadow-lg shadow-accent/30 transition hover:scale-105"
               onClick={handleNewSession}
             >
               <span className="material-symbols-outlined text-base">add</span>
@@ -143,7 +143,7 @@ function SessionSelector({ persona, onSessionSelected, onBack }) {
               {grouped[groupName].map((session) => (
                 <div
                   key={session.id}
-                  className="group relative cursor-pointer rounded-2xl border border-border/60 bg-surface/70 p-4 shadow-lg shadow-black/20 transition-all hover:-translate-y-1 hover:border-accent/40 hover:shadow-accent/10 hover:shadow-xl"
+                  className="group relative cursor-pointer rounded-2xl border border-border/60 bg-surface/70 p-4 shadow-lg shadow-surface/20 transition-all hover:-translate-y-1 hover:border-accent/40 hover:shadow-accent/10 hover:shadow-xl"
                   onClick={() => handleSelectSession(session)}
                 >
                   {/* Gradient border accent on hover */}
@@ -156,7 +156,7 @@ function SessionSelector({ persona, onSessionSelected, onBack }) {
                         <span className="font-medium text-text">Session #{session.id}</span>
                       </div>
                       <button
-                        className="rounded-lg p-1 text-muted transition hover:bg-rose-500/10 hover:text-rose-200"
+                        className="rounded-lg p-1 text-muted transition hover:bg-accent/10 hover:text-accent"
                         onClick={(e) => handleDeleteSession(e, session)}
                         title="Delete session"
                       >
@@ -164,7 +164,7 @@ function SessionSelector({ persona, onSessionSelected, onBack }) {
                       </button>
                     </div>
                     <div className="mt-2 flex-1">
-                      <p className="text-sm text-slate-300 line-clamp-2 break-words">
+                      <p className="text-sm text-muted line-clamp-2 break-words">
                         {session.preview}
                       </p>
                     </div>
