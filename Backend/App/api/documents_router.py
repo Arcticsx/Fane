@@ -7,11 +7,11 @@ from sqlalchemy.orm import Session
 try:
     from ..database import get_db
     from ..models import SourceDocument
-    from ..services.document_processor import process_document  # this will be defined elsewhere
+    from ..services.process_documents import process_document
 except ImportError:
     from database import get_db
     from models import SourceDocument
-    from services.document_processor import process_document
+    from services.process_documents import process_document
 
 router = APIRouter(prefix="/story", tags=["documents"])
 

@@ -1,6 +1,6 @@
 {
   "scripts": {
-    "backend": ".venv\\Scripts\\python.exe backend\\app\\main.py",
+    "backend": "python Backend/App/main.py",
     "frontend": "cd frontend && npm run dev",
     "fboth": "npm-run-all --parallel backend frontend"
   },
