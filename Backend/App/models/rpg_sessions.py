@@ -8,6 +8,7 @@ from sqlalchemy import (
     DateTime,
     ForeignKey,
     Boolean,
+    JSON,
 )
 from sqlalchemy.orm import relationship
 from .dbbase import Base
