@@ -109,7 +109,6 @@ frontend/
 ## Dependencies
 
 - **aisuite** - Unified interface for multiple LLM providers
-- **pymongo** - MongoDB driver for Python
 - **python-dotenv** - Environment variable management
 - **pytest** - Testing framework
 
