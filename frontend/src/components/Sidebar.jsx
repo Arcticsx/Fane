@@ -134,6 +134,7 @@ function Sidebar({ activeView, onViewChange, onCreateClick }) {
           e.key === 'Enter' && navigate('/')
         }
       >
+<<<<<<< Updated upstream
         <div className="flex items-baseline">
           <span className="text-2xl font-light tracking-[0.15em] text-text/80">
             fane
@@ -141,6 +142,14 @@ function Sidebar({ activeView, onViewChange, onCreateClick }) {
 
           <span className="text-2xl font-light text-accent ml-0.5">
             .
+=======
+        <div className="absolute inset-0 -z-10 opacity-0 group-hover:opacity-100 transition-opacity duration-500">
+          <div className="absolute inset-0 bg-accent/20 blur-2xl rounded-full"></div>
+        </div>
+        <div className="relative inline-block">
+          <span className="text-3xl font-bold tracking-tight text-text/90 hover:text-text transition-colors duration-300">
+            fane.
+>>>>>>> Stashed changes
           </span>
         </div>
       </div>
