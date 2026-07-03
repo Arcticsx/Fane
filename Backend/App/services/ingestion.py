@@ -99,25 +99,3 @@ def ingest_pdf_to_session(
             except OSError:
                 pass  # Log but don't fail
 
-
-# ⚡ OPTIONAL: Background Task Version (for FastAPI)
-def ingest_pdf_background(
-    db: Session,
-    session_id: str,
-    file,           # UploadFile
-    filename: str,
-):
-    """
-    Run ingestion in background to avoid HTTP timeout.
-    
-    Usage in FastAPI:
-        background_tasks.add_task(ingest_pdf_background, next(db), session_id, file, filename)
-        return {"message": "Processing started", "source_document_id": source_doc.id}
-    """
-    try:
-        # Re-open the file (FastAPI uploads can only be read once)
-        file.file.seek(0)  # Rewind if needed
-        ingest_pdf_to_session(db, session_id, file.file, filename)
-    except Exception as e:
-        print(f"Background ingestion failed: {str(e)}")
-        # Optionally notify the user via websocket/email
