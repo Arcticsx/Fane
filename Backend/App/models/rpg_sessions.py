@@ -26,16 +26,17 @@ class RpgSession(Base):
     title = Column(String, nullable=False)
     synopsis = Column(Text, nullable=True)
     genre = Column(String, nullable=True)
-    world_key = Column(String, nullable=True, index=True)
     magic_rules_md = Column(Text, nullable=True)
     active_chapter_number = Column(Integer, nullable=False, default=1)
-    word_count_total = Column(Integer, nullable=False, default=0)
     context_token_limit = Column(Integer, nullable=True)
     is_archived = Column(Boolean, nullable=False, default=False)
+    setup_status = Column(String, nullable=False, default="not_started")  # e.g. "not_started", "in_progress", "completed"
+    setup_error = Column(Text, nullable=True)  # store any error messages during setup
     created_at = Column(DateTime(timezone=True), default=_now, nullable=False)
     updated_at = Column(
         DateTime(timezone=True), default=_now, onupdate=_now, nullable=False
     )
+    chat_started_at = Column(DateTime(timezone=True), nullable=True)
 
     chapters = relationship(
         "ChronicleChapter",
@@ -72,7 +73,6 @@ class ChronicleChapter(Base):
     )
     number = Column(Integer, nullable=False)
     summary = Column(Text, nullable=True)
-    messages_json = Column(Text, nullable=False, default="[]")
     token_count = Column(Integer, nullable=False, default=0)
     is_closed = Column(Boolean, nullable=False, default=False)
     created_at = Column(DateTime(timezone=True), default=_now, nullable=False)
@@ -145,10 +145,18 @@ class StoryBeat(Base):
 
     id = Column(String, primary_key=True, default=_uuid)
     session_id = Column(String, ForeignKey("rpg_sessions.id", ondelete="CASCADE"), nullable=False)
+    beat_type = Column(String)  # e.g. "plot_point", "character_arc", "world_event"
+    source_document = Column(String, nullable=True)  # optional reference to a source document
+    starting_page = Column(Integer, nullable=True)  # optional starting page number in the source document
+    ending_page = Column(Integer, nullable=True)  # optional ending page number in the source document
     description = Column(Text)
-    triggered = Column(Boolean, default=False)
+    status = Column(String, default="pending")  # e.g. "pending", "in_progress", "completed"
+    retry_count = Column(Integer, default=0)  # number of times this beat has been retried
+    last_attempt = Column(string, nullable=True) 
     beat_order = Column(Integer)  # renamed from 'order' — reserved word, avoid even quoted
-
+    importance = Column(Integer, default=1)  # scale of 1-5, 5 being most important
+    introduces = Column(String, nullable=True)  # optional reference to a new character or lore entry introduced by this beat
+    requires = Column(String, nullable=True)  # optional reference to a character or lore entry required for this beat
     session = relationship("RpgSession", back_populates="story_beats")
 
 
