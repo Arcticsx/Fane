@@ -81,6 +81,7 @@ class SourceDocument(Base):
     total_pages = Column(Integer, nullable=True)
     
     # --- Relationships ---
+    session = relationship("RpgSession", back_populates="source_documents")
     characters = relationship("Character", back_populates="source_document")
     lore_entries = relationship("LoreEntry", back_populates="source_document")
     story_beats = relationship("StoryBeat", back_populates="source_document")
@@ -108,6 +109,9 @@ class ChronicleChapter(Base):
     turns = relationship(
         "TurnLog", back_populates="chapter", cascade="all, delete-orphan"
     )
+    messages = relationship(
+        "ChronicleMessages", back_populates="chapter", cascade="all, delete-orphan"
+    )   
 
     def __repr__(self) -> str:
         return (
@@ -185,21 +189,40 @@ class StoryBeat(Base):
     last_attempt = Column(Text, nullable=True) 
     beat_order = Column(Integer)  # renamed from 'order' — reserved word, avoid even quoted
     importance = Column(Integer, default=1)  # scale of 1-5, 5 being most important
-    introduces = Column(JSON, nullable=True)  # optional reference to a new character or lore entry introduced by this beat
-    requires = Column(JSON, nullable=True)  # optional reference to a character or lore entry required for this beat
+    introduces = Column(Text, nullable=True)  # optional reference to a new character or lore entry introduced by this beat
+    requires = Column(Text, nullable=True)  # optional reference to a character or lore entry required for this beat
     session = relationship("RpgSession", back_populates="story_beats")
-    source_document = relationship("SourceDocument", back_populates="story_beats")
-
+    
 class StoryEvent(Base):
     __tablename__ = "story_event"
 
     id = Column(String, primary_key=True, default=_uuid)
-    session_id = Column(String, ForeignKey("rpg_sessions.id", ondelete="CASCADE"), nullable=False)
-    chapter = Column(Integer)  # chapter number, not a FK
+    session_id = Column(
+        String,
+        ForeignKey("rpg_sessions.id", ondelete="CASCADE"),
+        nullable=False
+    )
+
+    source_document_id = Column(
+        String,
+        ForeignKey("source_document.id", ondelete="SET NULL"),
+        nullable=True
+    )
+
+    source_document = relationship(
+        "SourceDocument",
+        back_populates="story_events"   # fixed
+    )
+
+    chapter = Column(Integer)
     description = Column(Text)
     significance = Column(String)
 
-    session = relationship("RpgSession", back_populates="story_events")
+    session = relationship(
+        "RpgSession",
+        back_populates="story_events"
+    )
+    
 
 class TurnLog(Base):
     __tablename__ = "turn_log"
