@@ -29,7 +29,7 @@ def get_client():
     raise ValueError(f"Unsupported provider: {PROVIDER}")
 
 
-def get_response(messages, retries=3, backoff=2):
+def get_response(prompt, retries=3, backoff=2):
     client = get_client()
     last_error = None
 
@@ -44,7 +44,7 @@ def get_response(messages, retries=3, backoff=2):
 
     for attempt in range(1, retries + 1):
         try:
-            response = client.invoke(messages)
+            response = client.invoke(prompt)
 
             if not response.content:
                 raise ValueError(

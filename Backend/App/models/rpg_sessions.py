@@ -192,6 +192,7 @@ class StoryBeat(Base):
     importance = Column(Integer, default=1)  # scale of 1-5, 5 being most important
     introduces = Column(Text, nullable=True)  # optional reference to a new character or lore entry introduced by this beat
     requires = Column(Text, nullable=True)  # optional reference to a character or lore entry required for this beat
+    key_dialogues = Column(Text, nullable=True)
     session = relationship("RpgSession", back_populates="story_beats")
     
 class StoryEvent(Base):

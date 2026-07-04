@@ -6,10 +6,14 @@ import chromadb
 import uuid
 from typing import List, Dict, Any, Optional
 
+# NOTE: directory must exist before the PersistentClient is created against it,
+# and Path.mkdir() takes `exist_ok`, not `exist`.
+CHROMA_PERSIST_DIR.mkdir(exist_ok=True)
 _client = chromadb.PersistentClient(path=CHROMA_PERSIST_DIR)
 
+
 def get_or_create_collection(session_id: str, collection_type: str):
-    
+
     if collection_type not in ("docs", "lore"):
         raise ValueError(f"Invalid collection_type: {collection_type}. Must be 'docs' or 'lore'")
 
@@ -34,7 +38,7 @@ def save_chunks_to_chromadb(
     source_pdf: str,
     collection_type: str = "docs",
 ):
-    
+
     if len(chunks) != len(embeddings):
         raise ValueError(
             f"Mismatch between chunks ({len(chunks)}) and embeddings ({len(embeddings)})"
@@ -76,31 +80,50 @@ def save_chunks_to_chromadb(
 
 def query_chroma_by_page_range(
     session_id: str,
-    query_text: str,
     start_page: int,
     end_page: int,
-    n_results: int = 8,
+    n_results: int = 100,
     collection_type: str = "docs",
-) -> List[str]:
-   
+) -> List[Dict[str, Any]]:
+    """
+    Returns every chunk whose page falls within [start_page, end_page],
+    ordered by page then start_index. Uses collection.get() (a metadata
+    filter) rather than collection.query() (a similarity search), since
+    there is no meaningful query text here -- we want everything in the
+    range, not the top-k nearest to an empty/default embedding.
+
+    Returns a list of dicts: {"text": str, "page": int, "start_index": int,
+    "section": str, "subsection": str}
+    """
     try:
         collection = get_or_create_collection(session_id, collection_type)
     except ValueError:
         return []  # Collection doesn't exist yet
 
-    results = collection.query(
-        query_texts=[query_text],
-        n_results=n_results,
+    results = collection.get(
         where={
             "page": {"$gte": start_page, "$lte": end_page}
-        }
+        },
+        limit=n_results,
+        include=["documents", "metadatas"],
     )
-    
-    # Chroma returns results as list of lists: [[doc1, doc2, ...]]
-    if results and results.get("documents"):
-        return results["documents"][0]  # First query's results
-    
-    return []
+
+    docs = results.get("documents") or []
+    metas = results.get("metadatas") or []
+
+    formatted = []
+    for i, doc in enumerate(docs):
+        meta = metas[i] if i < len(metas) else {}
+        formatted.append({
+            "text": doc,
+            "page": meta.get("page"),
+            "start_index": meta.get("start_index"),
+            "section": meta.get("section"),
+            "subsection": meta.get("subsection"),
+        })
+
+    formatted.sort(key=lambda x: (x.get("page") or 0, x.get("start_index") or 0))
+    return formatted
 
 
 def query_chroma_for_lore(
@@ -126,13 +149,13 @@ def query_chroma_for_lore(
         where=where_filter if where_filter else None,
         include=["documents", "metadatas"]
     )
-    
+
     # Format results
     formatted = []
     if results and results.get("documents"):
         docs = results["documents"][0]
         metas = results["metadatas"][0] if results.get("metadatas") else []
-        
+
         for i, doc in enumerate(docs):
             meta = metas[i] if i < len(metas) else {}
             formatted.append({
@@ -143,7 +166,7 @@ def query_chroma_for_lore(
                 "section": meta.get("section"),
                 "subsection": meta.get("subsection"),
             })
-    
+
     return formatted
 
 
@@ -153,46 +176,44 @@ def get_all_chunks_by_page(
     end_page: int,
     collection_type: str = "docs",
 ) -> List[Dict[str, Any]]:
-    
- 
+
     try:
         collection = get_or_create_collection(session_id, collection_type)
     except ValueError:
         return []
 
-    # Chroma doesn't support direct get with where filters in all versions
-    # So we query with a dummy text and page filter
-    results = collection.query(
-        query_texts=["the story continues"],
-        n_results=100,  # Get many results, we'll filter further
+    # Metadata filter via collection.get() -- no similarity search needed.
+    results = collection.get(
         where={"page": {"$gte": start_page, "$lte": end_page}},
-        include=["documents", "metadatas"]
+        include=["documents", "metadatas"],
     )
-    
+
+    docs = results.get("documents") or []
+    metas = results.get("metadatas") or []
+
     formatted = []
-    if results and results.get("documents"):
-        docs = results["documents"][0]
-        metas = results["metadatas"][0] if results.get("metadatas") else []
-        
-        for i, doc in enumerate(docs):
-            meta = metas[i] if i < len(metas) else {}
-            formatted.append({
-                "text": doc,
-                "page": meta.get("page"),
-                "chunk_index": meta.get("chunk_index"),
-                "section": meta.get("section"),
-            })
-    
-    # Sort by page then chunk_index
-    formatted.sort(key=lambda x: (x.get("page", 0), x.get("chunk_index", 0)))
+    for i, doc in enumerate(docs):
+        meta = metas[i] if i < len(metas) else {}
+        formatted.append({
+            "text": doc,
+            "page": meta.get("page"),
+            # NOTE: chunking (documents.py) sets "start_index" via
+            # RecursiveCharacterTextSplitter(add_start_index=True), not
+            # "chunk_index" -- that key never existed, so sorting by it
+            # was always a no-op.
+            "start_index": meta.get("start_index"),
+            "section": meta.get("section"),
+        })
+
+    formatted.sort(key=lambda x: (x.get("page") or 0, x.get("start_index") or 0))
     return formatted
 
 
 def delete_session_collections(session_id: str) -> Dict[str, bool]:
-   
+
     client = _client
     results = {}
-    
+
     for collection_type in ["docs", "lore"]:
         collection_name = f"session_{session_id}_{collection_type}"
         try:
@@ -201,19 +222,19 @@ def delete_session_collections(session_id: str) -> Dict[str, bool]:
         except ValueError:
             # Collection doesn't exist
             results[collection_type] = False
-    
+
     return results
 
 
 def get_collection_stats(session_id: str) -> Dict[str, Any]:
-   
+
     stats = {}
-    
+
     for collection_type in ["docs", "lore"]:
         try:
             collection = get_or_create_collection(session_id, collection_type)
             stats[collection_type] = collection.count()
         except ValueError:
             stats[collection_type] = 0
-    
+
     return stats

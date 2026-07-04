@@ -1,8 +1,12 @@
 # Load environment variables from .env
 from dotenv import load_dotenv
 import os
+from pathlib import Path
 
 load_dotenv()
+
+BASE_DIR = Path(__file__).resolve().parent.parent
+DATA_DIR = BASE_DIR / "data"
 
 # Core settings read from environment
 MODEL = os.getenv("MODEL_NAME")
@@ -10,7 +14,7 @@ MONGO_URI = os.getenv("MONGO_URI")
 PROVIDER = os.getenv("PROVIDER")   # e.g. "openai", "anthropic", "ollama"
 API_KEY = os.getenv("API_KEY")
 EMBEDDING_MODEL = os.getenv("EMBEDDING_MODEL")  # e.g. "thenlper/gte-small"
-CHROMA_PERSIST_DIR = os.getenv("CHROMA_PERSIST_DIR")
+CHROMA_PERSIST_DIR = DATA_DIR / "chroma"
 # aisuite expects "provider:model-name" format, e.g. "openai:gpt-4o"
 AISUITE_MODEL = f"{PROVIDER}:{MODEL}" if PROVIDER and MODEL else None
 

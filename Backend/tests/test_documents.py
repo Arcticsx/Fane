@@ -1,6 +1,8 @@
 from App.services.documents import normalize_text
 import pytest
 
+# TEST NORMALIZE_TEXT:
+
 class TestWhiteSpaceCollapse: 
     
     def test_multiple_spaces_collapsed(self):
@@ -76,6 +78,9 @@ class TestEdgeCases:
         assert normalize_text(text) == expected
         
     
-        
+
+# TEST CHUNKER
+
+
 
     

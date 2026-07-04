@@ -3,6 +3,8 @@ import pymupdf4llm
 from langchain_text_splitters import RecursiveCharacterTextSplitter, MarkdownHeaderTextSplitter
 from langchain_core.documents import Document
 from sentence_transformers import SentenceTransformer
+import pymupdf
+import os
 
 try:
     from ..config import EMBEDDING_MODEL
@@ -16,6 +18,8 @@ def normalize_text(text):
     text = re.sub(r'\n{3,}', '\n\n', text)
     return text.strip()
 
+def convert_to_markdown(file_path):
+    return pymupdf4llm.to_markdown(file_path, page_chunks=True)
 
 _embedding_model = None
 
@@ -29,10 +33,8 @@ def _get_embedding_model():
 def token_length(text):
     return len(_get_embedding_model().tokenizer.encode(text))
 
-
-def chunk_document(file_path):
-    pages = pymupdf4llm.to_markdown(file_path, page_chunks=True)
-
+def chunk_headers(pages):
+    
     headers_to_split_on = [
         ("#", "section"),
         ("##", "subsection"),
@@ -52,6 +54,14 @@ def chunk_document(file_path):
         for split in splits:
             split.metadata["page"] = page_num
             header_chunks.append(split)
+    
+    return header_chunks
+
+
+def chunk_document(file_path):
+    pages = convert_to_markdown(file_path)
+
+    header_chunks = chunk_headers(pages)
 
     fallback_splitter = RecursiveCharacterTextSplitter(
         chunk_size=500,
@@ -76,3 +86,39 @@ def embed_chunks(chunks, batch_size: int = 16):  # Safer default for CPU
         convert_to_numpy=True,
     )
     return embeddings.tolist()
+
+
+def get_document_metadata(file_path):
+    
+    with pymupdf.open(file_path) as doc:
+        total_pages = doc.page_count
+
+    file_size = os.path.getsize(file_path)
+
+    return {
+        "total_pages": total_pages,
+        "file_size": file_size 
+    }
+    
+def generate_page_windows(total_pages, window_size=5, overlap=1):
+    windows = []
+    start = 1
+    step = window_size - overlap
+
+    while True:
+        end = min(start + window_size - 1, total_pages)
+        windows.append((start, end))
+
+        if end >= total_pages:
+            break
+
+        start += step
+
+    return windows
+            
+    
+    
+    
+    
+    
+    
