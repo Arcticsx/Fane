@@ -2,14 +2,9 @@ from fastapi import APIRouter, Depends, File, Form, HTTPException, UploadFile
 from sqlalchemy.orm import Session
 from typing import Optional
 
-try:
-    from ..database import get_db
-    from ..models.rpg_sessions import RpgSession
-    from ..services.ingestion import ingest_pdf_to_session
-except ImportError:
-    from database import get_db
-    from models.rpg_sessions import RpgSession
-    from services.ingestion import ingest_pdf_to_session
+from app.database import get_db
+from app.models.rpg_sessions import RpgSession
+from app.services.ingestion import ingest_pdf_to_session
 
 router = APIRouter(prefix="/story", tags=["chronicle"])
 
@@ -27,7 +22,6 @@ async def create_session(
         title=title,
         synopsis=synopsis,
         genre=genre,
-        world_key=world_key,
         magic_rules_md=magic_rules_md,
         context_token_limit=context_token_limit,
     )

@@ -4,14 +4,9 @@ import uuid
 from fastapi import APIRouter, Depends, File, HTTPException, UploadFile, BackgroundTasks
 from sqlalchemy.orm import Session
 
-try:
-    from ..database import get_db
-    from ..models import SourceDocument
-    from ..services.process_documents import process_document
-except ImportError:
-    from database import get_db
-    from models import SourceDocument
-    from services.process_documents import process_document
+from app.database import get_db
+from app.models import SourceDocument
+from app.services.process_documents import process_document
 
 router = APIRouter(prefix="/story", tags=["documents"])
 

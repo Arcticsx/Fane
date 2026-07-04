@@ -1,10 +1,10 @@
 import os
 import shutil
 from sqlalchemy.orm import Session
-from ..database import get_db
-from ..models import SourceDocument
-from .documents import chunk_document, embed_chunks
-from .vectorstore import save_chunks_to_chromadb
+from app.database import get_db
+from app.models import SourceDocument
+from app.services.documents import chunk_document, embed_chunks
+from app.services.vectorstore import save_chunks_to_chromadb
 
 
 def process_document(

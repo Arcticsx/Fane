@@ -3,14 +3,9 @@ import shutil
 import uuid
 from sqlalchemy.orm import Session
 
-try:
-    from .documents import chunk_document, embed_chunks
-    from .vectorstore import save_chunks_to_chromadb
-    from ..models import SourceDocument
-except ImportError:
-    from services.documents import chunk_document, embed_chunks
-    from services.vectorstore import save_chunks_to_chromadb
-    from models import SourceDocument
+from app.services.documents import chunk_document, embed_chunks
+from app.services.vectorstore import save_chunks_to_chromadb
+from app.models import SourceDocument
 
 UPLOAD_DIR = "app/data/uploads"
 ALLOWED_EXTENSIONS = {".pdf"}
@@ -74,7 +69,7 @@ def ingest_pdf_to_session(
             embeddings=embeddings,
             session_id=session_id,
             source_pdf=filename,
-            collection_type=collection_type,  # ✅ FIXED: "docs" for raw PDF
+            collection_type=collection_type,
         )
 
         # Step 5: Update SourceDocument
@@ -98,4 +93,3 @@ def ingest_pdf_to_session(
                 os.remove(temp_path)
             except OSError:
                 pass  # Log but don't fail
-
