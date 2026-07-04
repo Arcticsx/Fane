@@ -32,7 +32,6 @@ def token_length(text):
 
 def chunk_document(file_path):
     pages = pymupdf4llm.to_markdown(file_path, page_chunks=True)
-    # pages: list of dicts, each with "text" and a "metadata" dict (incl. page number)
 
     headers_to_split_on = [
         ("#", "section"),
@@ -46,6 +45,7 @@ def chunk_document(file_path):
     )
 
     header_chunks = []
+    
     for page_num, page in enumerate(pages, start=1):
         text = normalize_text(page["text"])
         splits = md_splitter.split_text(text)
