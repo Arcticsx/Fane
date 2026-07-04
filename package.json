@@ -5,11 +5,12 @@
     "fboth": "npm-run-all --parallel backend frontend"
   },
   "dependencies": {
-    "fastapi": "^0.0.8",
+    "@tailwindcss/vite": "^4.3.2",
     "line-clamp": "^1.0.0",
     "lucide-react": "^1.21.0",
     "react-router-dom": "^7.18.0",
     "sqlalchemy": "^10.1.1",
+    "tailwindcss": "^4.3.2",
     "vite": "^8.1.0"
   },
   "devDependencies": {
