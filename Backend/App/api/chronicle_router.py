@@ -2,9 +2,10 @@ from fastapi import APIRouter, Depends, File, Form, HTTPException, UploadFile
 from sqlalchemy.orm import Session
 from typing import Optional
 
-from app.database import get_db
-from app.models.rpg_sessions import RpgSession
-from app.services.ingestion import ingest_pdf_to_session
+from ..database import get_db
+from ..models.rpg_sessions import RpgSession
+from ..services.ingestion import ingest_pdf_to_session
+from ..services.chronicle_session import create_session
 
 router = APIRouter(prefix="/story", tags=["chronicle"])
 
@@ -16,18 +17,8 @@ async def create_session(
     genre: Optional[str] = Form(None),
     magic_rules_md: Optional[str] = Form(None),
     context_token_limit: Optional[int] = Form(None),
-    db: Session = Depends(get_db),
 ):
-    session = RpgSession(
-        title=title,
-        synopsis=synopsis,
-        genre=genre,
-        magic_rules_md=magic_rules_md,
-        context_token_limit=context_token_limit,
-    )
-    db.add(session)
-    db.commit()
-    db.refresh(session)
+    session = create_session(title, synopsis, genre, magic_rules_md, context_token_limit)
 
     return {
         "id": session.id,
@@ -37,3 +28,5 @@ async def create_session(
         "created_at": session.created_at.isoformat(),
         "chunks_saved": source_doc.chunk_count if source_doc else 0,
     }
+    
+    

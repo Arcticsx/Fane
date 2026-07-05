@@ -4,14 +4,14 @@ except ImportError:
     from vectorstore import query_chroma_by_page_range
 
 try:
-    from .response import get_response
+    from ..response import get_response
 except ImportError:
     from response import get_response
 
 import json
 import re
-from database import get_db
-from models.rpg_sessions import StoryBeat
+from ..database import get_db
+from ..models.rpg_sessions import StoryBeat
 
 SYSTEM_PROMPT = '''
 You are a Narrative Architect. Extract all mandatory plot beats from the given novel text, which covers pages {start_page}-{end_page}.

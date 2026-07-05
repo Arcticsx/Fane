@@ -13,7 +13,7 @@ except ImportError:
 
 from sqlalchemy import create_engine
 from sqlalchemy.orm import sessionmaker
-from config import BASE_DIR, DATA_DIR
+from .config import BASE_DIR, DATA_DIR
 
 
 

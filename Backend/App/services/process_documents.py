@@ -1,10 +1,10 @@
 import os
 import shutil
 from sqlalchemy.orm import Session
-from database import get_db
-from models import SourceDocument
-# from models import RpgSession  # only needed by the inactive CHANGE 4 block below
-from .documents import chunk_document, embed_chunks
+from ..database import get_db
+from ..models.rpg_sessions import SourceDocument
+from ..models.rpg_sessions import RpgSession  
+from .documents import chunk_document, embed_chunks, get_document_metadata, generate_page_windows
 from .vectorstore import save_chunks_to_chromadb
 
 # NOTE: the following imports are for functions used ONLY inside the

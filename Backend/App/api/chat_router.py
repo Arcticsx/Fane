@@ -11,16 +11,16 @@ from fastapi.middleware.cors import CORSMiddleware
 from fastapi.staticfiles import StaticFiles
 from pydantic import BaseModel
 
-from app.api.chronicle_router import router as chronicle_router
-from app.api.documents_router import router as documents_router
-from app.personalities import (
+from .chronicle_router import router as chronicle_router
+from .documents_router import router as documents_router
+from ..personalities import (
     get_personalities,
     create_personality,
     update_personality,
     delete_personality,
     pick_personality,
 )
-from app.database import (
+from ..database import (
     save_session,
     load_session,
     get_session_by_index,
@@ -31,16 +31,16 @@ from app.database import (
     init_db,
     get_db
 )
-from app.response import get_response
-from app.memory import trim_memory
-from app.config import textPrompt
+from ..response import get_response
+from ..memory import trim_memory
+from ..config import textPrompt
 
 import os
 import shutil
 import sqlite3
 from uuid import uuid4
 from pathlib import Path
-
+router = APIRouter()
 app = FastAPI()
 
 # Enable CORS for React frontend
