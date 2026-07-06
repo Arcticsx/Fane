@@ -12,7 +12,8 @@ import json
 import re
 from ..database import get_db
 from ..models.rpg_sessions import StoryBeat
-from typing import List, Dict, Any
+from typing import List, Dict, Any, Set
+from difflib import get_close_matches
 
 SYSTEM_PROMPT = '''
 You are a Narrative Architect. Extract ALL story beats from the given novel text, covering pages {start_page}-{end_page}.
@@ -112,6 +113,32 @@ Output:
 '''
 
 
+def _parse_json_response(response):
+    if isinstance(response, (list, dict)):
+        return response
+
+    if not isinstance(response, str):
+        return None
+
+    clean_response = re.sub(r'```json\s*', '', response)
+    clean_response = re.sub(r'```\s*', '', clean_response)
+
+    try:
+        return json.loads(clean_response.strip())
+    except json.JSONDecodeError:
+        return None
+
+
+def _coerce_int(value):
+    if value is None:
+        return None
+
+    try:
+        return int(value)
+    except (TypeError, ValueError):
+        return None
+
+
 def _assemble_pages_text(chunks):
     
     ordered = sorted(
@@ -147,14 +174,10 @@ def extract_beats_from_window(session_id, source_doc_id, start_page, end_page):
     )
 
     response = get_response(prompt)
+    beats = _parse_json_response(response)
 
-    clean_response = re.sub(r'```json\s*', '', response)
-    clean_response = re.sub(r'```\s*', '', clean_response)
-
-    try:
-        beats = json.loads(clean_response.strip())
-    except json.JSONDecodeError as e:
-        print(f"Failed to parse beats for pages {start_page}-{end_page}: {e}")
+    if beats is None:
+        print(f"Failed to parse beats for pages {start_page}-{end_page}: invalid JSON response")
         return []
 
     if not isinstance(beats, list):
@@ -197,15 +220,17 @@ def save_candidate_beats(source_doc_id: str, session_id: str, candidates: list[d
  
     try:
         for order, c in enumerate(candidates):
+            if not isinstance(c, dict):
+                continue
+
             beat = StoryBeat(
                 session_id=session_id,
                 source_document_id=source_doc_id,
                 beat_type=c.get("beat_type"),
                 description=c.get("description"),
-                status = "candidate",
-                starting_page=c.get("start_page"),
-                ending_page=c.get("end_page"),
-                beat_order = order,
+                status="candidate",
+                starting_page=_coerce_int(c.get("start_page")),
+                ending_page=_coerce_int(c.get("end_page")),
                 requires=json.dumps(c.get("requires", [])),
                 introduces=json.dumps(c.get("introduces", [])),
                 key_dialogues=json.dumps(c.get("key_dialogues", [])),
@@ -222,8 +247,156 @@ def save_candidate_beats(source_doc_id: str, session_id: str, candidates: list[d
  
     return saved
 
-def clean_candidate_beats():
+def cluster_candidates(candidates: List[Dict], cluster_size: int = 18, overlap: int = 5) -> List[List[Dict]]:
+    
+    # 1. Sort globally
+    sorted_candidates = sort_candidates(candidates)  # uses (start_page, end_page, order)
+    
+    clusters = []
+    i = 0
+    n = len(sorted_candidates)
+    while i < n:
+        cluster = sorted_candidates[i : i + cluster_size]
+        clusters.append(cluster)
+        # Move i forward by cluster_size - overlap (so next cluster overlaps)
+        i += cluster_size - overlap
+        if i >= n:
+            break
+    return clusters
+
+def reduce_cluster(cluster: List[Dict], llm_func) -> List[Dict]:
+
+    prompt = f"""
+You will receive a list of candidate beats (15–20) with inconsistent requires and introduces tags.
+Your first task is to unify these tags into a single canonical vocabulary within this cluster.
+For example, if one beat uses 'sword', another uses 'sword_of_light', you MUST replace them all with 'sword_of_light'.
+Then, deduplicate and merge overlapping/duplicate beats within this cluster.
+Output the final 10–12 definitive beats for this section.
+
+Candidate beats (JSON):
+{json.dumps(cluster, indent=2)}
+
+Output ONLY a JSON list of the cleaned beats, each with:
+- start_page, end_page
+- description
+- beat_type
+- requires (list of canonical tags)
+- introduces (list of canonical tags)
+- key_dialogues (list)
+- classification ("mandatory" or "scene")
+
+Do NOT include 'order' – that will be assigned later.
+"""
+    response = get_response(prompt)
+    # Clean markdown fences
+    clean = re.sub(r'```json\s*', '', response)
+    clean = re.sub(r'```\s*', '', clean)
+    try:
+        return json.loads(clean.strip())
+    except json.JSONDecodeError:
+        # fallback: return the original cluster (better than losing data)
+        print("Cluster LLM failed, returning original cluster")
+        return cluster
+    
+def merge_clusters(cleaned_clusters: List[List[Dict]]) -> List[Dict]:
+    
+    # 1. Flatten all clusters
+    all_beats = []
+    for cluster in cleaned_clusters:
+        all_beats.extend(cluster)
+    
+    # 2. Sort again by (start_page, end_page, order)
+    all_beats = sort_candidates(all_beats)
+    
+    # 3. Deduplicate using a sliding window
+    merged = []
+    for beat in all_beats:
+        if not merged:
+            merged.append(beat)
+            continue
+        last = merged[-1]
+        # Check if this beat overlaps with the last kept beat
+        if beat["start_page"] <= last["end_page"]:
+            # Overlap: decide which to keep
+            last_span = last["end_page"] - last["start_page"]
+            beat_span = beat["end_page"] - beat["start_page"]
+            if beat_span > last_span:
+                merged[-1] = beat
+            elif beat_span == last_span:
+                if len(beat.get("key_dialogues", [])) > len(last.get("key_dialogues", [])):
+                    merged[-1] = beat
+        else:
+            merged.append(beat)
     
     
+    merged = _canonicalize_tags_globally(merged)
     
-    pass
+    return merged
+
+
+def _canonicalize_tags_globally(beats: List[Dict]) -> List[Dict]:
+    """
+    Post-process all tags across the entire beat list using fuzzy matching.
+    This catches variations that the LLM might have missed.
+    
+    Uses get_close_matches with a cutoff of 0.85 (85% similarity).
+    """
+    # 1. Collect all unique tags from requires and introduces
+    all_tags: Set[str] = set()
+    for beat in beats:
+        all_tags.update(beat.get("requires", []))
+        all_tags.update(beat.get("introduces", []))
+    
+    all_tags = list(all_tags)
+    
+    # 2. Build a canonical mapping using fuzzy matching
+    tag_map: Dict[str, str] = {}
+    processed = set()
+    
+    for tag in sorted(all_tags):  # Sort for deterministic order
+        if tag in processed:
+            continue
+        # Find close matches (80%+ similarity)
+        matches = get_close_matches(tag, all_tags, n=10, cutoff=0.85)
+        if len(matches) > 1:
+            # Choose the shortest/most generic one as canonical
+            # Or pick the first one (alphabetically) for consistency
+            canonical = min(matches, key=len)  # Shortest is usually most generic
+            # But if there's a "sword_of_light" and "sword", "sword_of_light" is better
+            # Let's pick the one that appears most frequently (popularity vote)
+            if len(matches) > 2:
+                # Count occurrences in the actual beats
+                tag_counts = {}
+                for m in matches:
+                    count = 0
+                    for beat in beats:
+                        count += beat.get("requires", []).count(m)
+                        count += beat.get("introduces", []).count(m)
+                    tag_counts[m] = count
+                canonical = max(tag_counts, key=tag_counts.get)
+            else:
+                canonical = matches[0]
+        else:
+            canonical = tag
+        
+        # Map all close matches to the canonical tag
+        for m in matches:
+            tag_map[m] = canonical
+            processed.add(m)
+    
+    # 3. Apply the mapping to all beats
+    for beat in beats:
+        # Fix requires
+        if beat.get("requires"):
+            beat["requires"] = [tag_map.get(t, t) for t in beat["requires"]]
+        # Fix introduces
+        if beat.get("introduces"):
+            beat["introduces"] = [tag_map.get(t, t) for t in beat["introduces"]]
+        
+        # Remove duplicates within each list
+        if beat.get("requires"):
+            beat["requires"] = list(dict.fromkeys(beat["requires"]))  # Preserves order
+        if beat.get("introduces"):
+            beat["introduces"] = list(dict.fromkeys(beat["introduces"]))
+    
+    return beats

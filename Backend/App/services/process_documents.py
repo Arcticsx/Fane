@@ -8,6 +8,12 @@ from .documents import chunk_document, embed_chunks, get_document_metadata, gene
 from .vectorstore import save_chunks_to_chromadb
 from .extraction import extract_beats_from_window, sort_candidates, save_candidate_beats
 
+try:
+    from .logging_utils import log_error
+except ImportError:
+    def log_error(context, error, source_doc_id=None):
+        print(f"[{context}] source_doc_id={source_doc_id}: {error}")
+
 # NOTE: the following imports are for functions used ONLY inside the
 # commented-out (inactive) blocks below. Left commented so this file does
 # not fail to import if these modules don't exist yet.
