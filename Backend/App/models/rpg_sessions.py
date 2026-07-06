@@ -185,7 +185,7 @@ class StoryBeat(Base):
     starting_page = Column(Integer, nullable=True)  # optional starting page number in the source document
     ending_page = Column(Integer, nullable=True)  # optional ending page number in the source document
     description = Column(Text)
-    status = Column(String, default="pending")  # e.g. "pending", "in_progress", "completed"
+    status = Column(String, default="pending")  # e.g. "candidate, "pending", "in_progress", "completed", "skipped"
     retry_count = Column(Integer, default=0)  # number of times this beat has been retried
     last_attempt = Column(Text, nullable=True) 
     beat_order = Column(Integer)  # renamed from 'order' — reserved word, avoid even quoted
