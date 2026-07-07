@@ -1,4 +1,4 @@
-# SARP — Local AI Conversational App
+﻿# fane â€” Local AI Conversational App
 
 A CLI and web application for immersive roleplay conversations with AI-powered characters. It supports multiple LLM providers (OpenAI, Anthropic Claude, Ollama, and DeepSeek), persistent sessions, and customizable personalities.
 
@@ -95,39 +95,39 @@ npm run frontend
 
 ```text
 Backend/
-├── App/
-│   ├── api/
-│   │   ├── chat_router.py
-│   │   ├── chronicle_router.py
-│   │   └── documents_router.py
-│   ├── models/
-│   │   ├── dbbase.py
-│   │   ├── models.py
-│   │   └── rpg_sessions.py
-│   ├── services/
-│   │   ├── documents.py
-│   │   ├── ingestion.py
-│   │   └── vectorstore.py
-│   ├── main.py
-│   ├── chat.py
-│   ├── cli.py
-│   ├── config.py
-│   ├── database.py
-│   ├── memory.py
-│   ├── personalities.py
-│   └── response.py
-├── tests/
-│   ├── conftest.py
-│   └── test_*.py
+â”œâ”€â”€ App/
+â”‚   â”œâ”€â”€ api/
+â”‚   â”‚   â”œâ”€â”€ chat_router.py
+â”‚   â”‚   â”œâ”€â”€ chronicle_router.py
+â”‚   â”‚   â””â”€â”€ documents_router.py
+â”‚   â”œâ”€â”€ models/
+â”‚   â”‚   â”œâ”€â”€ dbbase.py
+â”‚   â”‚   â”œâ”€â”€ models.py
+â”‚   â”‚   â””â”€â”€ rpg_sessions.py
+â”‚   â”œâ”€â”€ services/
+â”‚   â”‚   â”œâ”€â”€ documents.py
+â”‚   â”‚   â”œâ”€â”€ ingestion.py
+â”‚   â”‚   â””â”€â”€ vectorstore.py
+â”‚   â”œâ”€â”€ main.py
+â”‚   â”œâ”€â”€ chat.py
+â”‚   â”œâ”€â”€ cli.py
+â”‚   â”œâ”€â”€ config.py
+â”‚   â”œâ”€â”€ database.py
+â”‚   â”œâ”€â”€ memory.py
+â”‚   â”œâ”€â”€ personalities.py
+â”‚   â””â”€â”€ response.py
+â”œâ”€â”€ tests/
+â”‚   â”œâ”€â”€ conftest.py
+â”‚   â””â”€â”€ test_*.py
 
 frontend/
-├── src/
-│   ├── components/
-│   ├── api.js
-│   ├── App.jsx
-│   └── index.jsx
-├── index.html
-└── package.json
+â”œâ”€â”€ src/
+â”‚   â”œâ”€â”€ components/
+â”‚   â”œâ”€â”€ api.js
+â”‚   â”œâ”€â”€ App.jsx
+â”‚   â””â”€â”€ index.jsx
+â”œâ”€â”€ index.html
+â””â”€â”€ package.json
 ```
 
 ## Dependencies
