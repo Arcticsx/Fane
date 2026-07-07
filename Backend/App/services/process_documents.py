@@ -53,14 +53,14 @@ def process_document(
                     source_doc.error_message = str(e)[:1000]
                     db.commit()
 
-        except Exception as e:
+    except Exception as e:
             source_doc = db.query(SourceDocument).filter(SourceDocument.id == source_doc_id).first()
             if source_doc:
                 source_doc.status = "failed"
                 source_doc.error_message = str(e)[:1000]
                 db.commit()
 
-        finally:
+    finally:
             if os.path.exists(temp_path):
                 try:
                     os.remove(temp_path)
