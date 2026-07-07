@@ -1,4 +1,4 @@
-from App.services.documents import normalize_text
+from Backend.app.services.documents import normalize_text
 import pytest
 
 # TEST NORMALIZE_TEXT:

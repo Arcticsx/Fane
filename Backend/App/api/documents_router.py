@@ -5,11 +5,11 @@ from pathlib import Path
 from fastapi import APIRouter, Depends, File, HTTPException, UploadFile, BackgroundTasks
 from sqlalchemy.orm import Session
 
-from app.config import DATA_DIR
-from app.database import get_db_session          # ← changed
-from app.models import SourceDocument
-from app.models.rpg_sessions import RpgSession
-from app.services.process_documents import process_document
+from ..config import DATA_DIR
+from ..database import get_db_session
+from ..models import SourceDocument
+from ..models.rpg_sessions import RpgSession
+from ..services.process_documents import process_document
 
 router = APIRouter(prefix="/story", tags=["documents"])
 

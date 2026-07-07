@@ -1,3 +1,6 @@
+import sys
+from pathlib import Path
+
 from .api.chat_router import app
 
 import uvicorn

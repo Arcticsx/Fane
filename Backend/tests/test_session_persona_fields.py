@@ -1,6 +1,6 @@
 from unittest.mock import MagicMock
 
-from database import save_session
+from Backend.app.database import save_session
 
 
 def test_save_session_accepts_persona_name_and_persona_id():

@@ -1,10 +1,10 @@
 # Main chat loop — orchestrates persona, session, message flow, and memory trimming
-from app.memory import trim_memory
-from app.config import textPrompt
-from app.database import save_session, load_session, get_db
-from app.cli import header, print_message, prompt_input, info
-from app.response import get_response
-from app.personalities import get_personalities, create_personality, pick_personality
+from .memory import trim_memory
+from .config import textPrompt
+from .database import save_session, load_session, get_db
+from .cli import header, print_message, prompt_input, info
+from .response import get_response
+from .personalities import get_personalities, create_personality, pick_personality
 
 def _cli_pick_personality():
     personalities = get_personalities()

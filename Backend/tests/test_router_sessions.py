@@ -6,7 +6,7 @@ from fastapi.testclient import TestClient
 
 sys.path.insert(0, str(Path(__file__).resolve().parents[1] / "app"))
 
-import api.router as router_module
+from Backend.app.api import chat_router as router_module
 
 
 @pytest.fixture

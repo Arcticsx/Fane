@@ -1,19 +1,19 @@
 import pytest
 from unittest.mock import MagicMock
-from app.personalities import get_personalities, create_personality, pick_personality
+from Backend.app.personalities import get_personalities, create_personality, pick_personality
 
 @pytest.fixture
 def mock_db_col(mocker):
-    # Patch the personalities_col in app.personalities module
-    mock_col = mocker.patch("app.personalities.personalities_col")
+    # Patch the personalities_col in Backend.app.personalities module
+    mock_col = mocker.patch("Backend.app.personalities.personalities_col")
     return mock_col
 
 @pytest.fixture
 def mock_cli(mocker):
-    # Patch cli functions used in app.personalities
-    mock_header = mocker.patch("app.personalities.header")
-    mock_prompt_input = mocker.patch("app.personalities.prompt_input")
-    mock_info = mocker.patch("app.personalities.info")
+    # Patch cli functions used in Backend.app.personalities
+    mock_header = mocker.patch("Backend.app.personalities.header")
+    mock_prompt_input = mocker.patch("Backend.app.personalities.prompt_input")
+    mock_info = mocker.patch("Backend.app.personalities.info")
     return {
         "header": mock_header,
         "prompt_input": mock_prompt_input,

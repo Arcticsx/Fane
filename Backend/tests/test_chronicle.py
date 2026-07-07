@@ -1,5 +1,5 @@
 from fastapi.testclient import TestClient
-from App.main import app
+from Backend.app.api.chat_router import app
 
 client = TestClient(app)
 
@@ -16,9 +16,7 @@ def main():
         }
     )
 
-```
-print(response.status_code)
-print(response.json())
-```
+    print(response.status_code)
+    print(response.json())
 
 main()

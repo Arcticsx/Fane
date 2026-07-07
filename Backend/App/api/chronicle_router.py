@@ -8,13 +8,13 @@ from pydantic import BaseModel
 from sqlalchemy.orm import Session
 from typing import Optional
 
-from app.database import get_db_session          # ← changed
-from app.models.rpg_sessions import RpgSession
-from app.response import get_response
-from app.models.rpg_sessions import ChronicleMessages
-from app.models.rpg_sessions import ChronicleChapter, SourceDocument, StoryBeat, StoryEvent, TurnLog
-from app.services.vectorstore import query_chroma_for_lore
-from app.config import DATA_DIR
+from ..database import get_db_session
+from ..models.rpg_sessions import RpgSession
+from ..response import get_response
+from ..models.rpg_sessions import ChronicleMessages
+from ..models.rpg_sessions import ChronicleChapter, SourceDocument, StoryBeat, StoryEvent, TurnLog
+from ..services.vectorstore import query_chroma_for_lore
+from ..config import DATA_DIR
 
 router = APIRouter(prefix="/story", tags=["chronicle"])
 AVATAR_DIR = Path(DATA_DIR) / "images"
