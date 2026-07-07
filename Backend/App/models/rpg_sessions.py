@@ -195,6 +195,25 @@ class StoryBeat(Base):
     key_dialogues = Column(Text, nullable=True)
     session = relationship("RpgSession", back_populates="story_beats")
     
+class GraphEdge(Base):
+    __tablename__ = "graph_edges"
+
+    id = Column(String, primary_key=True, default=_uuid)
+    session_id = Column(String, ForeignKey("rpg_sessions.id", ondelete="CASCADE"), nullable=False)
+    source_beat_id = Column(String, ForeignKey("story_beat.id", ondelete="CASCADE"), nullable=False)
+    target_beat_id = Column(String, ForeignKey("story_beat.id", ondelete="CASCADE"), nullable=False)
+    edge_type = Column(String, nullable=False)  # "causal", "structural", "spine"
+    
+    # Optional: conditions for conditional edges
+    condition_tag = Column(String, nullable=True)  # e.g., "has_sword"
+    
+    created_at = Column(DateTime(timezone=True), default=_now, nullable=False)
+
+    # Relationships
+    session = relationship("RpgSession", back_populates="graph_edges")
+    source_beat = relationship("StoryBeat", foreign_keys=[source_beat_id])
+    target_beat = relationship("StoryBeat", foreign_keys=[target_beat_id])
+
 class StoryEvent(Base):
     __tablename__ = "story_event"
 
