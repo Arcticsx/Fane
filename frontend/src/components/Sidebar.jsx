@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useCallback } from 'react';
-import { useNavigate, useParams } from 'react-router-dom';
+import { useLocation, useNavigate, useParams } from 'react-router-dom';
 import { api, getImageUrl } from '../api';
 
 function Sidebar({ activeView, onViewChange, onCreateClick }) {
@@ -8,6 +8,7 @@ function Sidebar({ activeView, onViewChange, onCreateClick }) {
   const [loading, setLoading] = useState(true);
 
   const navigate = useNavigate();
+  const location = useLocation();
   const { sessionId: activeSessionId } = useParams();
 
   useEffect(() => {
@@ -88,6 +89,37 @@ function Sidebar({ activeView, onViewChange, onCreateClick }) {
     [width]
   );
 
+  const resolvedActiveView = activeView || (location.pathname.startsWith('/chronicle') ? 'Chronicle' : location.pathname.startsWith('/sessions') ? 'create' : 'discover');
+
+  const handleNav = (itemKey) => {
+    const currentState = location.state || {};
+
+    if (itemKey === 'create') {
+      if (location.pathname.startsWith('/chronicle')) {
+        navigate('/chronicle', { state: currentState });
+      } else if (typeof onCreateClick === 'function') {
+        onCreateClick();
+      } else {
+        navigate('/', { state: currentState });
+      }
+      return;
+    }
+
+    if (itemKey === 'discover') {
+      navigate('/', { state: currentState });
+      return;
+    }
+
+    if (itemKey === 'Chronicle') {
+      navigate('/chronicle/discover', { state: currentState });
+      return;
+    }
+
+    if (typeof onViewChange === 'function') {
+      onViewChange(itemKey);
+    }
+  };
+
   const items = [
     {
       key: 'create',
@@ -126,12 +158,12 @@ function Sidebar({ activeView, onViewChange, onCreateClick }) {
     >
       {/* Logo */}
       <div
-        onClick={() => navigate('/')}
+        onClick={() => navigate('/', { state: location.state || {} })}
         className="px-6 pb-6 cursor-pointer transition-opacity duration-300 hover:opacity-70"
         role="button"
         tabIndex={0}
         onKeyDown={(e) =>
-          e.key === 'Enter' && navigate('/')
+          e.key === 'Enter' && navigate('/', { state: location.state || {} })
         }
       >
         <div className="absolute inset-0 -z-10 opacity-0 group-hover:opacity-100 transition-opacity duration-500">
@@ -148,17 +180,12 @@ function Sidebar({ activeView, onViewChange, onCreateClick }) {
       <nav className="flex flex-col gap-2 px-3">
         {items.map((item) => {
           const isActive =
-            activeView === item.key;
+            resolvedActiveView === item.key;
 
           return (
             <button
               key={item.key}
-              onClick={
-                item.key === 'create'
-                  ? onCreateClick
-                  : () =>
-                      onViewChange(item.key)
-              }
+              onClick={() => handleNav(item.key)}
               className={`relative flex items-center gap-3 rounded-xl px-3 py-2.5 text-left text-sm font-medium transition-all duration-200 ${
                 isActive
                   ? 'bg-accent/10 text-accent shadow-[inset_0_1px_0_rgba(255,255,255,0.1)]'
@@ -238,19 +265,13 @@ function Sidebar({ activeView, onViewChange, onCreateClick }) {
                 <div className="h-8 w-8 shrink-0 overflow-hidden rounded-full bg-gradient-to-br from-accent2 to-accent">
                   {session.persona_avatar ? (
                     <img
-                      src={getImageUrl(
-                        session.persona_avatar
-                      )}
-                      alt={
-                        session.persona_name
-                      }
+                      src={getImageUrl(session.persona_avatar)}
+                      alt={session.persona_name}
                       className="h-full w-full object-cover"
                     />
                   ) : (
                     <div className="flex h-full w-full items-center justify-center text-sm font-semibold text-text">
-                      {session.persona_name?.charAt(
-                        0
-                      )}
+                      {session.persona_name?.charAt(0)}
                     </div>
                   )}
                 </div>

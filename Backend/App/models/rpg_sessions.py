@@ -29,6 +29,7 @@ class RpgSession(Base):
     magic_rules_md = Column(Text, nullable=True)
     active_chapter_number = Column(Integer, nullable=False, default=1)
     context_token_limit = Column(Integer, nullable=True)
+    avatar = Column(String, nullable=True)
     is_archived = Column(Boolean, nullable=False, default=False)
     setup_status = Column(String, nullable=False, default="not_started")  # e.g. "not_started", "in_progress", "completed"
     setup_error = Column(Text, nullable=True)  # store any error messages during setup
@@ -80,6 +81,7 @@ class SourceDocument(Base):
     error_message = Column(Text, nullable=True)
     file_size_bytes = Column(Integer, nullable=True)
     total_pages = Column(Integer, nullable=True)
+    file_path = Column(String, nullable=True)
     
     # --- Relationships ---
     session = relationship("RpgSession", back_populates="source_documents")

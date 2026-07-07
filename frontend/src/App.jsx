@@ -4,6 +4,11 @@ import PersonalitySelector from './components/PersonalitySelector.jsx';
 import SessionSelector from './components/SessionSelector.jsx';
 import Chat from './components/Chat.jsx';
 import Sidebar from './components/Sidebar';
+import ChronicleCreator from './components/ChronicleCreator';
+import ChronicleSelector from './components/ChronicleSelector';
+import ChronicleSessionSelector from './components/ChronicleSessionSelector';
+import ChronicleDetail from './components/ChronicleDetail';
+import ChronicleChat from './components/ChronicleChat';
 import themes from './themes';
 
 function AppContent() {
@@ -12,7 +17,6 @@ function AppContent() {
   const [selectedThemeId, setSelectedThemeId] = React.useState('purpur');
   const [customBackgroundUrl, setCustomBackgroundUrl] = React.useState('');
 
-  // theme list supports adding user-created themes (persisted to localStorage)
   const [themeList, setThemeList] = React.useState(() => {
     try {
       const stored = JSON.parse(localStorage.getItem('appThemes') || 'null');
@@ -41,7 +45,6 @@ function AppContent() {
   }, [selectedThemeId]);
 
   React.useEffect(() => {
-    // persist only user-created themes (marked with `custom: true`)
     try {
       const custom = themeList.filter((t) => t.custom === true);
       localStorage.setItem('appThemes', JSON.stringify(custom));
@@ -65,7 +68,6 @@ function AppContent() {
   };
 
   const handleCreateCustomTheme = (theme) => {
-    // ensure unique id
     const id = `custom-${Date.now()}`;
     const t = { id, ...theme, custom: true };
     setThemeList((prev) => [...prev, t]);
@@ -84,7 +86,6 @@ function AppContent() {
 
   const handleUpdateTheme = (id, updates) => {
     setThemeList((prev) => prev.map((t) => (t.id === id ? { ...t, ...updates } : t)));
-    // if the updated theme is currently selected, refresh selection so vars update
     if (selectedThemeId === id) {
       setSelectedThemeId(id);
     }
@@ -111,15 +112,18 @@ function AppContent() {
     setPreviewThemeObject(null);
   };
 
-  // Derive persona and session directly from location — single source of truth
   const routePersona = location.state?.persona || null;
   const routeSession = location.state?.session || null;
-  // Keep a mutable ref for use in callbacks without stale closures
   const personaRef = React.useRef(routePersona);
   personaRef.current = routePersona;
 
+  const navigateWithHistory = React.useCallback((to, options = {}) => {
+    const historyState = { ...(location.state || {}), ...(options.state || {}) };
+    navigate(to, { ...options, state: historyState });
+  }, [location.state, navigate]);
+
   const handlePersonaSelected = (persona) => {
-    navigate(`/sessions/${encodeURIComponent(persona.key)}`, { state: { persona } });
+    navigateWithHistory(`/sessions/${encodeURIComponent(persona.key)}`, { state: { persona } });
   };
 
   const handleSessionSelected = (session) => {
@@ -131,17 +135,17 @@ function AppContent() {
     const targetPath = session
       ? `/chat/${encodeURIComponent(persona.key)}/${session.id}`
       : `/chat/${encodeURIComponent(persona.key)}`;
-    navigate(targetPath, { state: { persona, session } });
+    navigateWithHistory(targetPath, { state: { persona, session } });
   };
 
   const handleBackToPersonalities = () => {
-    navigate('/');
+    navigateWithHistory('/');
   };
 
   const handleBackToSessions = () => {
     const persona = personaRef.current;
     if (!persona?.key) return;
-    navigate(`/sessions/${encodeURIComponent(persona.key)}`, { state: { persona } });
+    navigateWithHistory(`/sessions/${encodeURIComponent(persona.key)}`, { state: { persona } });
   };
 
   const themeVars = {
@@ -227,10 +231,68 @@ function AppContent() {
           </div>
           }
         />
+        <Route
+          path="/chronicle"
+          element={
+            <div className="flex h-screen">
+              <Sidebar
+                activeView="Chronicle"
+                onViewChange={() => {}}
+                onCreateClick={() => navigate('/chronicle')}
+              />
+              <main className="flex-1 overflow-hidden">
+                <ChronicleCreator />
+              </main>
+            </div>
+          }
+        />
+        <Route
+          path="/chronicle/discover"
+          element={
+            <div className="flex h-screen">
+              <Sidebar
+                activeView="Chronicle"
+                onViewChange={() => {}}
+                onCreateClick={() => navigate('/chronicle')}
+              />
+              <main className="flex-1 overflow-hidden">
+                <ChronicleSelector />
+              </main>
+            </div>
+          }
+        />
+        <Route
+          path="/chronicle/list"
+          element={
+            <div className="flex h-screen">
+              <Sidebar
+                activeView="Chronicle"
+                onViewChange={() => {}}
+                onCreateClick={() => navigate('/chronicle')}
+              />
+              <main className="flex-1 overflow-hidden">
+                <ChronicleSelector />
+              </main>
+            </div>
+          }
+        />
+        <Route
+          path="/chronicle/:chronicleId"
+          element={
+            <div className="flex h-screen">
+              <Sidebar activeView="Chronicle" onViewChange={() => {}} onCreateClick={() => navigate('/chronicle')} />
+              <main className="flex-1 overflow-hidden">
+                <ChronicleDetail />
+              </main>
+            </div>
+          }
+        />
       </Routes>
     </div>
   );
 }
+
+// keep existing exports
 
 function App() {
   return (

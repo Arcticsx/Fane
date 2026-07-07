@@ -1,16 +1,19 @@
 import os
 import shutil
 import uuid
+from pathlib import Path
 from fastapi import APIRouter, Depends, File, HTTPException, UploadFile, BackgroundTasks
 from sqlalchemy.orm import Session
 
-from ..database import get_db
-from ..models import SourceDocument
-from ..services.process_documents import process_document
+from app.config import DATA_DIR
+from app.database import get_db_session          # ← changed
+from app.models import SourceDocument
+from app.models.rpg_sessions import RpgSession
+from app.services.process_documents import process_document
 
 router = APIRouter(prefix="/story", tags=["documents"])
 
-UPLOAD_DIR = "app/data/uploads"
+UPLOAD_DIR = Path(DATA_DIR) / "files"
 ALLOWED_EXTENSIONS = {".pdf"}
 
 
@@ -18,63 +21,66 @@ ALLOWED_EXTENSIONS = {".pdf"}
 async def create_story_document(
     id: str,
     file: UploadFile = File(...),
-    db: Session = Depends(get_db),
+    db: Session = Depends(get_db_session),        # ← changed
     background_tasks: BackgroundTasks = BackgroundTasks(),
 ):
-    # 1. Validate file extension
     ext = os.path.splitext(file.filename)[1].lower()
     if ext not in ALLOWED_EXTENSIONS:
         raise HTTPException(status_code=400, detail=f"Unsupported file type: {ext}")
 
-    # 2. Ensure upload directory exists
-    os.makedirs(UPLOAD_DIR, exist_ok=True)
-    temp_path = os.path.join(UPLOAD_DIR, f"{uuid.uuid4()}{ext}")
+    UPLOAD_DIR.mkdir(parents=True, exist_ok=True)
+    safe_name = f"{id[:8]}_{uuid.uuid4().hex}_{Path(file.filename or 'upload.pdf').name}"
+    file_path = UPLOAD_DIR / safe_name
 
-    # 3. Create SourceDocument record (status = "processing")
     source_doc = SourceDocument(
         session_id=id,
         filename=file.filename,
         status="processing",
         chunk_count=0,
+        file_path=str(file_path),
     )
     db.add(source_doc)
     db.commit()
     db.refresh(source_doc)
 
-    # 4. Save uploaded file to temp location
+    session = db.query(RpgSession).filter(RpgSession.id == id).first()
+    if session:
+        session.setup_status = "processing"
+        session.setup_error = None
+        db.commit()
+
     try:
-        with open(temp_path, "wb") as f:
+        with open(file_path, "wb") as f:
             shutil.copyfileobj(file.file, f)
     except Exception as e:
-        # If file can't be saved, mark document as failed and re-raise
         source_doc.status = "failed"
         db.commit()
         raise HTTPException(status_code=500, detail=f"Could not save uploaded file: {e}")
 
-    # 5. Offload processing to background
     background_tasks.add_task(
         process_document,
         source_doc_id=source_doc.id,
         session_id=id,
-        temp_path=temp_path,
+        temp_path=str(file_path),
         filename=file.filename,
     )
 
-    # 6. Return immediately with processing status
     return {
         "status": "processing",
         "session_id": id,
         "source_document_id": source_doc.id,
         "filename": file.filename,
+        "file_path": str(file_path),
+        "file_url": f"/data/files/{file_path.name}",
         "message": "Document is being processed in the background."
     }
-    
+
 
 @router.get("/{id}/docs/{doc_id}/status")
 async def get_document_status(
     id: str,
     doc_id: str,
-    db: Session = Depends(get_db),
+    db: Session = Depends(get_db_session),        # ← changed
 ):
     doc = db.query(SourceDocument).filter(
         SourceDocument.session_id == id,

@@ -11,7 +11,7 @@ except ImportError:
     from models import Session, Message, Context
     from models.dbbase import Base
 
-from sqlalchemy import create_engine
+from sqlalchemy import create_engine, inspect, text
 from sqlalchemy.orm import sessionmaker
 from .config import BASE_DIR, DATA_DIR
 
@@ -38,9 +38,30 @@ def get_db():
     finally:
         db.close()
 
+
+def get_db_session():
+    """FastAPI dependency: yields an actual Session (use with Depends)."""
+    with get_db() as db:
+        yield db
+
+
+def get_db_session():
+    """FastAPI dependency: yields an actual Session (use with Depends)."""
+    with get_db() as db:
+        yield db
+
 def init_db():
-    """Initialize database tables."""
+    """Initialize database tables and add any missing columns for older databases."""
     Base.metadata.create_all(bind=engine)
+
+    with engine.begin() as conn:
+        inspector = inspect(conn)
+        if 'rpg_sessions' not in inspector.get_table_names():
+            return
+
+        columns = {column['name'] for column in inspector.get_columns('rpg_sessions')}
+        if 'avatar' not in columns:
+            conn.execute(text('ALTER TABLE rpg_sessions ADD COLUMN avatar VARCHAR'))
 
 def get_sessions(db, persona_key: str):
     rows = (
@@ -124,36 +145,49 @@ def get_session_by_index(db, persona_key, index: int, persona_id=None):
         "updated_at": row.updated_at,
     }
 
-def load_session(db, persona, system_message, session=None):
-    if session:
-        session_id = session["id"]
-        rows = (
-            db.query(Message)
-            .filter(Message.session_id == session_id)
-            .order_by(Message.id.asc())
-            .all()
-        )
-        context_rows = (
-            db.query(Context)
-            .filter(Context.session_id == session_id)
-            .order_by(Context.id.asc())
-            .all()
-        )
-        full_messages = [system_message]
-        for row in rows:
-            if row.sender == "system":
-                continue
-            full_messages.append({"id": row.id, "role": row.sender, "content": row.content})
-        context = [system_message]
-        for row in context_rows:
-            if row.sender == "system":
-                continue
-            context.append({"id": row.id, "role": row.sender, "content": row.content})
-    else:
+_NO_SESSION = object()
+
+def load_session(db, persona, system_message, session=_NO_SESSION):
+    # If caller provided the `session` argument (even if it's None), treat as
+    # router usage and return (context, full_messages). If the caller omitted
+    # the argument (CLI usage), return (context, full_messages, session_obj).
+    if session is not _NO_SESSION:
+        if session:
+            session_id = session["id"]
+            rows = (
+                db.query(Message)
+                .filter(Message.session_id == session_id)
+                .order_by(Message.id.asc())
+                .all()
+            )
+            context_rows = (
+                db.query(Context)
+                .filter(Context.session_id == session_id)
+                .order_by(Context.id.asc())
+                .all()
+            )
+            full_messages = [system_message]
+            for row in rows:
+                if row.sender == "system":
+                    continue
+                full_messages.append({"id": row.id, "role": row.sender, "content": row.content})
+            context = [system_message]
+            for row in context_rows:
+                if row.sender == "system":
+                    continue
+                context.append({"id": row.id, "role": row.sender, "content": row.content})
+            return context, full_messages
+
         first_msg = persona.get("opening_prompt", "Introduce yourself and start the conversation.")
         full_messages = [system_message, {"role": "assistant", "content": first_msg}]
         context = [system_message.copy(), {"role": "assistant", "content": first_msg}]
-    return context, full_messages
+        return context, full_messages
+
+    # CLI caller (no session argument provided): return triple including session placeholder
+    first_msg = persona.get("opening_prompt", "Introduce yourself and start the conversation.")
+    full_messages = [system_message, {"role": "assistant", "content": first_msg}]
+    context = [system_message.copy(), {"role": "assistant", "content": first_msg}]
+    return context, full_messages, None
 
 def save_session(db, persona_key, messages=None, context=None, session_id=None):
     if messages is None:

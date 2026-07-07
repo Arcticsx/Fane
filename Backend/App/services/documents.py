@@ -19,19 +19,45 @@ def normalize_text(text):
     return text.strip()
 
 def convert_to_markdown(file_path):
-    return pymupdf4llm.to_markdown(file_path, page_chunks=True)
+    try:
+        return pymupdf4llm.to_markdown(file_path, page_chunks=True)
+    except Exception:
+        # Fallback: if PDF-to-markdown fails (missing libs or corrupt PDF),
+        # try a minimal text extraction to keep processing moving.
+        try:
+            with open(file_path, "rb") as f:
+                raw = f.read()
+            text = raw.decode("utf-8", errors="ignore")
+        except Exception:
+            text = ""
+
+        # Return a single-page-like structure compatible with the rest of the pipeline
+        return [{"text": text or ""}]
 
 _embedding_model = None
 
 def _get_embedding_model():
     global _embedding_model
     if _embedding_model is None:
-        _embedding_model = SentenceTransformer(EMBEDDING_MODEL)
+        try:
+            if not EMBEDDING_MODEL:
+                _embedding_model = None
+            else:
+                _embedding_model = SentenceTransformer(EMBEDDING_MODEL)
+        except Exception:
+            _embedding_model = None
     return _embedding_model
 
 
 def token_length(text):
-    return len(_get_embedding_model().tokenizer.encode(text))
+    model = _get_embedding_model()
+    if model is None:
+        # Fallback: approximate token count by word count
+        return max(1, len(text.split()))
+    try:
+        return len(model.tokenizer.encode(text))
+    except Exception:
+        return max(1, len(text.split()))
 
 def chunk_headers(pages):
     
@@ -77,27 +103,32 @@ def chunk_document(file_path):
 def embed_chunks(chunks, batch_size: int = 16):  # Safer default for CPU
     if not chunks:
         return []
+    model = _get_embedding_model()
     texts = [chunk.page_content for chunk in chunks]
-    embeddings = _get_embedding_model().encode(
+    if model is None:
+        raise RuntimeError("Embedding model not configured")
+    embeddings = model.encode(
         texts,
         batch_size=batch_size,
         normalize_embeddings=True,
-        show_progress_bar=True,  # Keep True for MVP (visibility)
+        show_progress_bar=True,
         convert_to_numpy=True,
     )
     return embeddings.tolist()
 
 
 def get_document_metadata(file_path):
-    
-    with pymupdf.open(file_path) as doc:
-        total_pages = doc.page_count
+    try:
+        with pymupdf.open(file_path) as doc:
+            total_pages = doc.page_count
+    except Exception:
+        total_pages = None
 
     file_size = os.path.getsize(file_path)
 
     return {
         "total_pages": total_pages,
-        "file_size": file_size 
+        "file_size": file_size,
     }
     
 def generate_page_windows(total_pages, window_size=5, overlap=1):

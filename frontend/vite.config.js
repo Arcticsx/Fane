@@ -9,7 +9,8 @@ export default defineConfig({
     proxy: {
       '/personalities': 'http://localhost:8000',
       '/sessions': 'http://localhost:8000',
-      '/chat': 'http://localhost:8000'
+      '/chat': 'http://localhost:8000',
+      '/story': 'http://localhost:8000'   // ← CRITICAL: forward /story to backend
     }
   }
 })

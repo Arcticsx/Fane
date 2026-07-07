@@ -10,6 +10,7 @@ from fastapi import (
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.staticfiles import StaticFiles
 from pydantic import BaseModel
+from sqlalchemy.orm import Session
 
 from .chronicle_router import router as chronicle_router
 from .documents_router import router as documents_router
@@ -37,8 +38,7 @@ from ..config import textPrompt
 
 import os
 import shutil
-import sqlite3
-from uuid import uuid4
+import uuid
 from pathlib import Path
 router = APIRouter()
 app = FastAPI()
@@ -52,18 +52,20 @@ app.add_middleware(
     allow_headers=["*"],
 )
 AVATAR_DIR = Path(DATA_DIR) / "images"
+FILES_DIR = Path(DATA_DIR) / "files"
 
 os.makedirs(AVATAR_DIR, exist_ok=True)
+os.makedirs(FILES_DIR, exist_ok=True)
 
-# Mount static files to serve images
 app.mount("/data/images", StaticFiles(directory=str(AVATAR_DIR)), name="images")
+app.mount("/data/files", StaticFiles(directory=str(FILES_DIR)), name="files")
 
 init_db()
 
 
 def db_dependency():
-    with get_db() as conn:
-        yield conn
+    with get_db() as db:
+        yield db
 
 
 #------------------PERSONALITIES----------------------
@@ -86,16 +88,11 @@ async def create_persona(
     avatar_rel_path = None
 
     if avatar:
-        # Keep unique filename
         extension = avatar.filename.split(".")[-1]
-        filename = f"{uuid4()}.{extension}"
-
-        # Store file in Data/images/
+        filename = f"{uuid.uuid4()}.{extension}"
         file_path = AVATAR_DIR / filename
         with open(file_path, "wb") as buffer:
             shutil.copyfileobj(avatar.file, buffer)
-        
-        # Return URL path for frontend to access
         avatar_rel_path = f"/data/images/{filename}"
 
     return create_personality(
@@ -122,14 +119,10 @@ async def update_persona(
 
     if avatar:
         extension = avatar.filename.split(".")[-1]
-        filename = f"{uuid4()}.{extension}"
-
-        # Store file in Data/images/
+        filename = f"{uuid.uuid4()}.{extension}"
         file_path = AVATAR_DIR / filename
         with open(file_path, "wb") as buffer:
             shutil.copyfileobj(avatar.file, buffer)
-        
-        # Return URL path for frontend to access
         avatar_rel_path = f"/data/images/{filename}"
 
     updated = update_personality(
@@ -174,15 +167,15 @@ def pick_persona(body: PickPersonaRequest):
 
 #------------------SESSIONS----------------------
 @app.get("/sessions/recent")
-def list_recent_sessions(conn: sqlite3.Connection = Depends(db_dependency)):
-    rows = get_recent_sessions(conn)
+def list_recent_sessions(db: Session = Depends(db_dependency)):
+    rows = get_recent_sessions(db)
     return {"sessions": rows}
 
 
 @app.get("/sessions/{persona_key}")
-def list_sessions(persona_key: str, conn: sqlite3.Connection = Depends(db_dependency)):
+def list_sessions(persona_key: str, db: Session = Depends(db_dependency)):
     try:
-        sessions = get_sessions(conn, persona_key)
+        sessions = get_sessions(db, persona_key)
         return {"sessions": sessions}
     except Exception as e:
         import traceback
@@ -191,8 +184,8 @@ def list_sessions(persona_key: str, conn: sqlite3.Connection = Depends(db_depend
 
 
 @app.delete("/sessions/{persona_key}/{session_id}")
-def delete_session_endpoint(persona_key: str, session_id: int, conn: sqlite3.Connection = Depends(db_dependency)):
-    deleted = delete_session(conn, session_id)
+def delete_session_endpoint(persona_key: str, session_id: int, db: Session = Depends(db_dependency)):
+    deleted = delete_session(db, session_id)
     if not deleted:
         raise HTTPException(status_code=404, detail="Session not found.")
     return {"deleted": True}
@@ -200,15 +193,14 @@ def delete_session_endpoint(persona_key: str, session_id: int, conn: sqlite3.Con
 
 class PickSessionRequest(BaseModel):
     persona_key: str
-    index: int | None = None  # None = start new session
+    index: int | None = None
 
 @app.post("/sessions/pick")
-def pick_session_endpoint(body: PickSessionRequest, conn: sqlite3.Connection = Depends(db_dependency)):
-    """Pick a session by index, or pass null index to start a new one."""
+def pick_session_endpoint(body: PickSessionRequest, db: Session = Depends(db_dependency)):
     if body.index is None:
         return {"session": None, "new": True}
 
-    session = get_session_by_index(conn, body.persona_key, body.index - 1)  # 1-based
+    session = get_session_by_index(db, body.persona_key, body.index - 1)
     if not session:
         return {"session": None, "new": True, "warning": "Index out of range, starting new session."}
 
@@ -222,11 +214,10 @@ class SessionData(BaseModel):
 
 class LoadSessionRequest(BaseModel):
     persona_key: str | None = None
-    session: SessionData | None = None  # pass null to start fresh
-    
+    session: SessionData | None = None
 
 @app.post("/sessions/load")
-def load(body: LoadSessionRequest, conn: sqlite3.Connection = Depends(db_dependency)):
+def load(body: LoadSessionRequest, db: Session = Depends(db_dependency)):
     print("load body:", body)
     personalities = get_personalities()
     persona = personalities.get(body.persona_key)
@@ -237,7 +228,7 @@ def load(body: LoadSessionRequest, conn: sqlite3.Connection = Depends(db_depende
     system_message = {"role": "system", "content": template}
 
     session_dict = body.session.model_dump() if body.session else None
-    context, full_messages = load_session(conn, persona, system_message, session_dict)
+    context, full_messages = load_session(db, persona, system_message, session_dict)
 
     clean_messages = [{k: v for k, v in m.items() if k != "id"} for m in full_messages]
     clean_context = [{k: v for k, v in m.items() if k != "id"} for m in context]
@@ -262,14 +253,14 @@ class SaveSessionRequest(BaseModel):
     session_id: int | None = None
 
 @app.post("/sessions/save")
-def save(body: SaveSessionRequest, conn: sqlite3.Connection = Depends(db_dependency)):
+def save(body: SaveSessionRequest, db: Session = Depends(db_dependency)):
     personalities = get_personalities()
     persona = personalities.get(body.persona_key)
     if not persona:
         raise HTTPException(status_code=404, detail="Persona not found.")
 
     session_id = save_session(
-        conn,
+        db,
         body.persona_key,
         messages=body.messages,
         context=body.context,
@@ -307,11 +298,9 @@ def chat(body: ChatRequest):
     except RuntimeError as e:
         raise HTTPException(status_code=503, detail=str(e))
 
-    
     messages.append({"role": "assistant", "content": assistant_msg})
     messages = trim_memory(messages, system_message)
 
-    # Update full context history
     msg_id = max((m.get("id", 0) for m in body.context), default=0)
     context = body.context + [
         {"id": msg_id + 1, "role": "user",      "content": body.user_input},
@@ -323,5 +312,6 @@ def chat(body: ChatRequest):
         "messages": messages,
         "context": context,
     }
+
 app.include_router(chronicle_router)
 app.include_router(documents_router)
