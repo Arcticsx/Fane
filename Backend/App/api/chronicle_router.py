@@ -3,17 +3,23 @@ import shutil
 import uuid
 from datetime import datetime, timezone
 from pathlib import Path
+from typing import Optional
 
 from fastapi import APIRouter, Depends, File, Form, HTTPException, UploadFile
 from pydantic import BaseModel
 from sqlalchemy.orm import Session
-from typing import Optional
 
 from ..database import get_db_session
-from ..models.rpg_sessions import RpgSession
+from ..models.rpg_sessions import (
+    ChronicleChapter,
+    ChronicleMessages,
+    RpgSession,
+    SourceDocument,
+    StoryBeat,
+    StoryEvent,
+    TurnLog,
+)
 from ..response import get_response
-from ..models.rpg_sessions import ChronicleMessages
-from ..models.rpg_sessions import ChronicleChapter, SourceDocument, StoryBeat, StoryEvent, TurnLog
 from ..services.vectorstore import query_chroma_for_lore
 from ..config import DATA_DIR
 
@@ -22,11 +28,43 @@ AVATAR_DIR = Path(DATA_DIR) / "images"
 AVATAR_DIR.mkdir(parents=True, exist_ok=True)
 
 
-# ── Request Models ──────────────────────────────────────────
-class ChronicleChainRequest(BaseModel):
-    """Request model for chronicle chat/chain interactions"""
-    user_input: str
-    chapter_id: Optional[str] = None
+@router.get("")
+async def list_sessions(db: Session = Depends(get_db_session)):
+    sessions = (
+        db.query(RpgSession)
+        .order_by(RpgSession.created_at.desc())
+        .all()
+    )
+    return [
+        {
+            "id": session.id,
+            "title": session.title,
+            "synopsis": session.synopsis,
+            "genre": session.genre,
+            "setup_status": session.setup_status,
+            "created_at": session.created_at.isoformat() if session.created_at else None,
+            "avatar": session.avatar,
+        }
+        for session in sessions
+    ]
+
+
+@router.get("/{session_id}")
+async def get_session(session_id: str, db: Session = Depends(get_db_session)):
+    session = db.query(RpgSession).filter(RpgSession.id == session_id).first()
+    if not session:
+        raise HTTPException(status_code=404, detail="Session not found")
+
+    return {
+        "id": session.id,
+        "title": session.title,
+        "synopsis": session.synopsis,
+        "genre": session.genre,
+        "magic_rules_md": session.magic_rules_md,
+        "setup_status": session.setup_status,
+        "created_at": session.created_at.isoformat() if session.created_at else None,
+        "avatar": session.avatar,
+    }
 
 
 @router.post("")
@@ -71,33 +109,40 @@ async def create_session(
     }
 
 
+class ChronicleChatRequest(BaseModel):
+    user_input: str
+    chapter_id: Optional[str] = None
+
+
 @router.post("/{session_id}/chat")
 async def chronicle_chat(
     session_id: str,
-    body: ChronicleChainRequest,
+    body: ChronicleChatRequest,
     db: Session = Depends(get_db_session),
 ):
-    """Handle chat messages for a chronicle session"""
-    
-    # Fetch the session
     session = db.query(RpgSession).filter(RpgSession.id == session_id).first()
     if not session:
         raise HTTPException(status_code=404, detail="Session not found")
-    
-    # Get or create chapter
+
+    chapter = None
     if body.chapter_id:
-        chapter = db.query(ChronicleChapter).filter(
-            ChronicleChapter.id == body.chapter_id,
-            ChronicleChapter.session_id == session_id
-        ).first()
+        chapter = (
+            db.query(ChronicleChapter)
+            .filter(
+                ChronicleChapter.id == body.chapter_id,
+                ChronicleChapter.session_id == session_id,
+            )
+            .first()
+        )
         if not chapter:
             raise HTTPException(status_code=404, detail="Chapter not found")
     else:
-        chapter = db.query(ChronicleChapter).filter(
-            ChronicleChapter.session_id == session_id
-        ).order_by(ChronicleChapter.number).first()
-        
-        # Auto-create first chapter if none exists
+        chapter = (
+            db.query(ChronicleChapter)
+            .filter(ChronicleChapter.session_id == session_id)
+            .order_by(ChronicleChapter.number)
+            .first()
+        )
         if not chapter:
             chapter = ChronicleChapter(
                 id=str(uuid.uuid4()),
@@ -107,64 +152,73 @@ async def chronicle_chat(
             )
             db.add(chapter)
             db.flush()
-    
-    # Fetch recent messages for context
-    recent_messages = db.query(ChronicleMessages).filter(
-        ChronicleMessages.session_id == session_id,
-        ChronicleMessages.chapter_id == chapter.id
-    ).order_by(ChronicleMessages.created_at.asc()).limit(20).all()
-    
-    # Build message history with proper role mapping for LLM
-    # Map "player" -> "user" and "narrator" -> "assistant" for LLM compatibility
-    message_history = []
-    for m in recent_messages:
-        role = "user" if m.sender == "player" else "assistant" if m.sender == "narrator" else m.sender
-        message_history.append({"role": role, "content": m.content})
-    
-    # Build system prompt with session context
-    system_prompt = f"""You are a chronicle storyteller for an RPG session.
-Title: {session.title}
-Genre: {session.genre}
-Setting: {session.synopsis or 'Unknown'}
-World Rules: {session.magic_rules_md or 'No special rules'}
 
-Respond in character, maintaining narrative consistency."""
-    
-    # Get AI response
+    recent_messages = (
+        db.query(ChronicleMessages)
+        .filter(
+            ChronicleMessages.session_id == session_id,
+            ChronicleMessages.chapter_id == chapter.id,
+        )
+        .order_by(ChronicleMessages.created_at.asc())
+        .limit(20)
+        .all()
+    )
+
+    message_history = []
+    for message in recent_messages:
+        role = message.sender
+        if role == "player":
+            role = "user"
+        elif role == "narrator":
+            role = "assistant"
+        message_history.append({"role": role, "content": message.content})
+
+    system_prompt = (
+        f"You are a chronicle storyteller for an RPG session.\n"
+        f"Title: {session.title}\n"
+        f"Genre: {session.genre or 'Unknown'}\n"
+        f"Synopsis: {session.synopsis or 'No synopsis'}\n"
+        f"World Rules: {session.magic_rules_md or 'No special rules'}\n"
+        "Respond in character and maintain narrative consistency."
+    )
+
     try:
-        messages = [{"role": "system", "content": system_prompt}] + message_history + [
-            {"role": "user", "content": body.user_input}
-        ]
+        messages = [{"role": "system", "content": system_prompt}]
+        messages.extend(message_history)
+        messages.append({"role": "user", "content": body.user_input})
         assistant_response = get_response(messages)
-    except RuntimeError as e:
-        raise HTTPException(status_code=503, detail=str(e))
-    
-    # Store user message with proper UUID
-    user_msg = ChronicleMessages(
+    except RuntimeError as exc:
+        raise HTTPException(status_code=503, detail=str(exc)) from exc
+
+    user_message = ChronicleMessages(
         id=str(uuid.uuid4()),
         session_id=session_id,
         chapter_id=chapter.id,
         sender="player",
         content=body.user_input,
     )
-    db.add(user_msg)
-    db.flush()
-    
-    # Store assistant response with proper UUID
-    assistant_msg = ChronicleMessages(
+    assistant_message = ChronicleMessages(
         id=str(uuid.uuid4()),
         session_id=session_id,
         chapter_id=chapter.id,
         sender="narrator",
         content=assistant_response,
     )
-    db.add(assistant_msg)
+    db.add_all([user_message, assistant_message])
     db.commit()
-    
+
+    chat_messages = [
+        *message_history,
+        {"role": "user", "content": body.user_input},
+        {"role": "assistant", "content": assistant_response},
+    ]
+
     return {
         "session_id": session_id,
         "chapter_id": chapter.id,
         "user_input": body.user_input,
         "response": assistant_response,
+        "message": assistant_response,
+        "messages": chat_messages,
         "timestamp": datetime.now(timezone.utc).isoformat(),
     }

@@ -54,8 +54,8 @@ export default function ChronicleChat({ chronicleId, onBack }) {
       const res = await api.chatChronicle(chronicleId, userText);
       if (res?.messages) {
         setMessages(res.messages);
-      } else if (res?.message) {
-        setMessages((prev) => [...prev, { role: 'assistant', content: res.message }]);
+      } else if (res?.response || res?.message) {
+        setMessages((prev) => [...prev, { role: 'assistant', content: res.response || res.message }]);
       }
     } catch (err) {
       console.error('Chat failed', err);

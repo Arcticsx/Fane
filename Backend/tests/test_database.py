@@ -2,7 +2,7 @@
 import pytest
 from datetime import datetime
 from unittest.mock import Mock, patch, MagicMock, call
-from Backend.app.database import save_session, get_sessions, delete_session
+from database import save_session, get_sessions, pick_session, delete_session
 
 
 class TestSaveSession:
