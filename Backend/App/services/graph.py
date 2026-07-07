@@ -1,5 +1,7 @@
 from bisect import bisect_left, bisect_right
 from dataclasses import dataclass
+from ..database import get_db
+from ..models.rpg_sessions import GraphEdge
 
 
 @dataclass
@@ -63,3 +65,48 @@ def build_beat_graph(beats: list[dict]) -> list[dict]:
                 edges.append(Edge(pos, target, "structural"))
 
     return [{"source": e.source, "target": e.target, "kind": e.kind} for e in edges]
+
+
+def persist_beat_graph(
+    db: Session,
+    session_id: str,
+    beats: List[Dict],
+    edges: List[Dict],
+) -> int:
+    """
+    Persist graph edges produced by build_beat_graph() into the graph_edges table.
+    Uses the caller's session — does not open its own.
+    """
+    n = len(beats)
+    beat_ids = [b["id"] for b in beats]
+
+    try:
+        deleted = db.query(GraphEdge).filter(
+            GraphEdge.session_id == session_id,
+            GraphEdge.source_beat_id.in_(beat_ids),
+        ).delete(synchronize_session=False)
+        print(f"Deleted {deleted} existing graph edges for session {session_id}")
+
+        inserted = 0
+        for edge in edges:
+            src, tgt = edge["source"], edge["target"]
+            if not (0 <= src < n and 0 <= tgt < n):
+                print(f"Skipping edge with out-of-range index: {edge}")
+                continue
+
+            db.add(GraphEdge(
+                session_id=session_id,
+                source_beat_id=beat_ids[src],
+                target_beat_id=beat_ids[tgt],
+                edge_type=edge["kind"],
+                condition_tag=edge.get("condition_tag"),
+            ))
+            inserted += 1
+
+        db.commit()
+        print(f"Inserted {inserted} graph edges")
+        return inserted
+
+    except Exception as e:
+        db.rollback()
+        raise RuntimeError(f"Failed to persist beat graph for session {session_id}: {e}") from e
