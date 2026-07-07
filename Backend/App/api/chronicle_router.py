@@ -1,5 +1,6 @@
 import re
 import shutil
+import uuid
 from datetime import datetime, timezone
 from pathlib import Path
 
@@ -83,7 +84,7 @@ async def chronicle_chat(
     if not session:
         raise HTTPException(status_code=404, detail="Session not found")
     
-    # Get or create chapter (use first chapter or provided one)
+    # Get or create chapter
     if body.chapter_id:
         chapter = db.query(ChronicleChapter).filter(
             ChronicleChapter.id == body.chapter_id,
@@ -95,20 +96,32 @@ async def chronicle_chat(
         chapter = db.query(ChronicleChapter).filter(
             ChronicleChapter.session_id == session_id
         ).order_by(ChronicleChapter.number).first()
+        
+        # Auto-create first chapter if none exists
         if not chapter:
-            raise HTTPException(status_code=400, detail="No chapters found for this session")
+            chapter = ChronicleChapter(
+                id=str(uuid.uuid4()),
+                session_id=session_id,
+                number=1,
+                title=f"Chapter 1: {session.title}",
+                content="",
+                setup_status="in_progress",
+            )
+            db.add(chapter)
+            db.flush()
     
     # Fetch recent messages for context
     recent_messages = db.query(ChronicleMessages).filter(
         ChronicleMessages.session_id == session_id,
         ChronicleMessages.chapter_id == chapter.id
-    ).order_by(ChronicleMessages.created_at.desc()).limit(10).all()
+    ).order_by(ChronicleMessages.created_at.asc()).limit(20).all()
     
-    # Build message history in conversation order
-    message_history = [
-        {"role": m.sender, "content": m.content}
-        for m in reversed(recent_messages)
-    ]
+    # Build message history with proper role mapping for LLM
+    # Map "player" -> "user" and "narrator" -> "assistant" for LLM compatibility
+    message_history = []
+    for m in recent_messages:
+        role = "user" if m.sender == "player" else "assistant" if m.sender == "narrator" else m.sender
+        message_history.append({"role": role, "content": m.content})
     
     # Build system prompt with session context
     system_prompt = f"""You are a chronicle storyteller for an RPG session.
@@ -128,9 +141,9 @@ Respond in character, maintaining narrative consistency."""
     except RuntimeError as e:
         raise HTTPException(status_code=503, detail=str(e))
     
-    # Store user message
+    # Store user message with proper UUID
     user_msg = ChronicleMessages(
-        id=str(re.sub(r'[^a-zA-Z0-9-]', '', str(datetime.now(timezone.utc)))),
+        id=str(uuid.uuid4()),
         session_id=session_id,
         chapter_id=chapter.id,
         sender="player",
@@ -139,9 +152,9 @@ Respond in character, maintaining narrative consistency."""
     db.add(user_msg)
     db.flush()
     
-    # Store assistant response
+    # Store assistant response with proper UUID
     assistant_msg = ChronicleMessages(
-        id=str(re.sub(r'[^a-zA-Z0-9-]', '', str(datetime.now(timezone.utc)))) + "_ai",
+        id=str(uuid.uuid4()),
         session_id=session_id,
         chapter_id=chapter.id,
         sender="narrator",
