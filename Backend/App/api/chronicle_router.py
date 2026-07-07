@@ -103,9 +103,7 @@ async def chronicle_chat(
                 id=str(uuid.uuid4()),
                 session_id=session_id,
                 number=1,
-                title=f"Chapter 1: {session.title}",
-                content="",
-                setup_status="in_progress",
+                summary="",
             )
             db.add(chapter)
             db.flush()
