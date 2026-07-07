@@ -59,5 +59,5 @@ async def create_session(
         "genre": session.genre,
         "setup_status": session.setup_status,
         "created_at": session.created_at.isoformat(),
-        "chunks_saved": source_doc.chunk_count if source_doc else 0,
+        "avatar": avatar_rel_path,
     }

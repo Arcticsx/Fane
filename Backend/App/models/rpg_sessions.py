@@ -63,6 +63,9 @@ class RpgSession(Base):
     chronicle_messages = relationship(
         "ChronicleMessages", back_populates="session", cascade="all, delete-orphan"
     )
+    graph_edges = relationship(
+        "GraphEdge", back_populates="session", cascade="all, delete-orphan"
+    )
 
     def __repr__(self) -> str:
         return f"<RpgSession id={self.id!r} title={self.title!r}>"
