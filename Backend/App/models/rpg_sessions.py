@@ -200,6 +200,19 @@ class StoryBeat(Base):
     key_dialogues = Column(Text, nullable=True)
     session = relationship("RpgSession", back_populates="story_beats")
     
+    outgoing_edges = relationship(
+        "GraphEdge",
+        foreign_keys="GraphEdge.source_beat_id",
+        back_populates="source_beat",
+        cascade="all, delete-orphan",
+    )
+    incoming_edges = relationship(
+        "GraphEdge",
+        foreign_keys="GraphEdge.target_beat_id",
+        back_populates="target_beat",
+        cascade="all, delete-orphan",
+    )
+    
 class GraphEdge(Base):
     __tablename__ = "graph_edges"
 
@@ -216,8 +229,12 @@ class GraphEdge(Base):
 
     # Relationships
     session = relationship("RpgSession", back_populates="graph_edges")
-    source_beat = relationship("StoryBeat", foreign_keys=[source_beat_id])
-    target_beat = relationship("StoryBeat", foreign_keys=[target_beat_id])
+    source_beat = relationship(
+        "StoryBeat", foreign_keys=[source_beat_id], back_populates="outgoing_edges"
+    )
+    target_beat = relationship(
+        "StoryBeat", foreign_keys=[target_beat_id], back_populates="incoming_edges"
+    )
 
 class StoryEvent(Base):
     __tablename__ = "story_event"
