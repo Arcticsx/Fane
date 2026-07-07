@@ -84,14 +84,14 @@ def chunk_headers(pages):
     return header_chunks
 
 
-def chunk_document(file_path):
+def chunk_document(file_path, chunksize, overlap):
     pages = convert_to_markdown(file_path)
 
     header_chunks = chunk_headers(pages)
 
     fallback_splitter = RecursiveCharacterTextSplitter(
-        chunk_size=500,
-        chunk_overlap=50,
+        chunk_size=chunksize,
+        chunk_overlap=overlap,
         length_function=token_length,
         separators=["\n\n", "\n", ". ", " ", ""],
         add_start_index=True,

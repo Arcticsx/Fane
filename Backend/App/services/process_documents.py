@@ -12,12 +12,23 @@ def process_document(
     temp_path: str,
     filename: str,
 ):
-    with get_db() as db:
-        source_doc = None
-        try:
-            chunks = chunk_document(temp_path)
-            if not chunks:
-                raise ValueError("No content extracted")
+    
+    db = next(get_db())  # create a fresh session for background task
+
+    try:
+        
+        source_doc = db.query(SourceDocument).filter(SourceDocument.id == source_doc_id).first()
+        if source_doc:
+            from datetime import datetime, timezone
+            source_doc.processing_started_at = datetime.now(timezone.utc)
+            db.commit()
+
+       
+        doc_meta = get_document_metadata(temp_path)
+
+        chunks = chunk_document(temp_path, chunksize=500, overlap=50)
+        if not chunks:
+            raise ValueError("No content extracted")
 
             source_doc = db.query(SourceDocument).filter(SourceDocument.id == source_doc_id).first()
             if source_doc:

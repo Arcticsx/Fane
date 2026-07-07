@@ -265,7 +265,7 @@ def cluster_candidates(candidates: List[Dict], cluster_size: int = 18, overlap: 
             break
     return clusters
 
-def reduce_cluster(cluster: List[Dict], llm_func) -> List[Dict]:
+def reduce_cluster(cluster: List[Dict]) -> List[Dict]:
 
     prompt = f"""
 You will receive a list of candidate beats (15–20) with inconsistent requires and introduces tags.
@@ -401,3 +401,88 @@ def _canonicalize_tags_globally(beats: List[Dict]) -> List[Dict]:
             beat["introduces"] = list(dict.fromkeys(beat["introduces"]))
     
     return beats
+
+
+def global_polish(merged_beats: List[Dict]) -> List[Dict]:
+    """
+    Renumber beats globally and fix cross-cluster dependency issues.
+    """
+    prompt = f"""
+Here is a list of final, non-overlapping beats. Do NOT change descriptions, page ranges, or merge anything.
+Your ONLY tasks are:
+1. Renumber them sequentially (1 to N) based on start_page.
+2. Review requires and introduces globally. If a beat uses a tag that isn't introduced earlier, correct it.
+Output the full list with 'order' added.
+Beats:
+{json.dumps(merged_beats, indent=2)}
+"""
+    response = get_response(prompt)
+    clean = re.sub(r'```json\s*', '', response)
+    clean = re.sub(r'```\s*', '', clean).strip()
+
+    try:
+        result = json.loads(clean)
+        if not isinstance(result, list) or len(result) != len(merged_beats):
+            raise ValueError(
+                f"Expected {len(merged_beats)} beats, got "
+                f"{len(result) if isinstance(result, list) else type(result).__name__}"
+            )
+        return result
+    except (json.JSONDecodeError, ValueError) as e:
+        print(f"global_polish LLM output invalid ({e}), falling back to deterministic renumbering")
+        ordered = sorted(merged_beats, key=lambda b: b["start_page"])
+        for i, beat in enumerate(ordered, 1):
+            beat["order"] = i
+        return ordered
+
+
+def replace_candidates_with_final_beats(
+    db: Session,
+    session_id: str,
+    source_doc_id: str,
+    final_beats: List[Dict]
+) -> int:
+    
+    try:
+        deleted = db.query(StoryBeat).filter(
+            StoryBeat.session_id == session_id,
+            StoryBeat.source_document_id == source_doc_id,
+            StoryBeat.status == "candidate"
+        ).delete(synchronize_session=False)
+        print(f"Deleted {deleted} candidate beats for {source_doc_id}")
+
+        inserted = 0
+        skipped = 0
+        for beat_data in final_beats:
+            description = beat_data.get("description")
+            if not description:
+                skipped += 1
+                continue
+
+            db.add(StoryBeat(
+                session_id=session_id,
+                source_document_id=source_doc_id,
+                status="pending",  # ready for gameplay
+                beat_order=beat_data.get("order", 0),
+                beat_type=beat_data.get("beat_type"),
+                classification=beat_data.get("classification", "scene"),
+                description=description,
+                starting_page=_coerce_int(beat_data.get("start_page")),
+                ending_page=_coerce_int(beat_data.get("end_page")),
+                requires=json.dumps(beat_data.get("requires", [])),
+                introduces=json.dumps(beat_data.get("introduces", [])),
+                key_dialogues=json.dumps(beat_data.get("key_dialogues", [])),
+                retry_count=0,
+                importance=beat_data.get("importance", 1),
+            ))
+            inserted += 1
+
+        db.commit()
+        if skipped:
+            print(f"Skipped {skipped} beat(s) missing 'description'")
+        print(f"Inserted {inserted} final beats with status='pending'")
+        return inserted
+
+    except Exception as e:
+        db.rollback()
+        raise RuntimeError(f"Failed to replace candidates for {source_doc_id}: {e}") from e
