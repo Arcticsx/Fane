@@ -1,68 +1,65 @@
 import os
 
 from ..database import get_db
-from ..models import SourceDocument
-from .documents import chunk_document, embed_chunks
-from .vectorstore import save_chunks_to_chromadb
+from ..models import RpgSession, SourceDocument
+from .beats import generate_windows
+from .extraction import extract_beats_from_window, replace_candidates_with_final_beats
+from .beats_reduce import run_reduce_phase
+from .beats_graph import run_graph_phase
+from .graph import persist_beat_graph
 
 
-def process_document(
-    source_doc_id: str,
+def process_story_beats(
     session_id: str,
-    temp_path: str,
-    filename: str,
+    source_document_id: str,
 ):
-    
+
     db = next(get_db())  # create a fresh session for background task
 
     try:
-        
-        source_doc = db.query(SourceDocument).filter(SourceDocument.id == source_doc_id).first()
-        if source_doc:
-            from datetime import datetime, timezone
-            source_doc.processing_started_at = datetime.now(timezone.utc)
+
+        session = db.query(RpgSession).filter(RpgSession.id == session_id).first()
+        if session:
+            session.setup_status = "extracting"
             db.commit()
 
-       
-        doc_meta = get_document_metadata(temp_path)
+        source_doc = db.query(SourceDocument).filter(SourceDocument.id == source_document_id).first()
+        if not source_doc or not source_doc.total_pages:
+            raise ValueError("Source document missing or has no total_pages")
 
-        chunks = chunk_document(temp_path, chunksize=500, overlap=50)
-        if not chunks:
-            raise ValueError("No content extracted")
+        windows = generate_windows(total_pages=source_doc.total_pages)
 
-            source_doc = db.query(SourceDocument).filter(SourceDocument.id == source_doc_id).first()
-            if source_doc:
-                source_doc.chunk_count = len(chunks)
-                source_doc.status = "ready"
-                db.commit()
-
-            try:
-                embeddings = embed_chunks(chunks)
-                result = save_chunks_to_chromadb(
-                    chunks=chunks,
-                    embeddings=embeddings,
+        candidate_beats = []
+        for window in windows:
+            candidate_beats.extend(
+                extract_beats_from_window(
+                    window=window,
                     session_id=session_id,
-                    source_pdf=filename,
-                    collection_type="docs",
+                    source_document_id=source_document_id,
                 )
-                if source_doc and isinstance(result, dict) and "chunks_saved" in result:
-                    source_doc.chunk_count = result["chunks_saved"]
-                    db.commit()
-            except Exception as e:
-                if source_doc:
-                    source_doc.error_message = str(e)[:1000]
-                    db.commit()
+            )
+
+        if not candidate_beats:
+            raise ValueError("No beats extracted")
+
+        final_beats = run_reduce_phase(candidate_beats)
+
+        replace_candidates_with_final_beats(db, session_id, final_beats)
+
+        graph_edges = run_graph_phase(final_beats)
+
+        persist_beat_graph(db, session_id, graph_edges)
+
+        if session:
+            session.setup_status = "ready"
+            db.commit()
 
     except Exception as e:
-            source_doc = db.query(SourceDocument).filter(SourceDocument.id == source_doc_id).first()
-            if source_doc:
-                source_doc.status = "failed"
-                source_doc.error_message = str(e)[:1000]
-                db.commit()
+        session = db.query(RpgSession).filter(RpgSession.id == session_id).first()
+        if session:
+            session.setup_status = "failed"
+            session.setup_error = str(e)[:1000]
+            db.commit()
 
     finally:
-            if os.path.exists(temp_path):
-                try:
-                    os.remove(temp_path)
-                except OSError:
-                    pass
+        pass
