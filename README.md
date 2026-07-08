@@ -1,4 +1,4 @@
-﻿# fane â€” Local AI Conversational App
+﻿# fane -- Local AI Conversational App
 
 A CLI and web application for immersive roleplay conversations with AI-powered characters. It supports multiple LLM providers (OpenAI, Anthropic Claude, Ollama, and DeepSeek), persistent sessions, and customizable personalities.
 
