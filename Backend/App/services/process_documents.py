@@ -1,8 +1,8 @@
 import os
 
 from ..database import get_db
-from ..models import RpgSession, SourceDocument
-from .beats import generate_windows
+from ..models.rpg_sessions import RpgSession, SourceDocument
+from .documents import generate_page_windows
 from .extraction import extract_beats_from_window, replace_candidates_with_final_beats
 from .beats_reduce import run_reduce_phase
 from .beats_graph import run_graph_phase
@@ -27,7 +27,7 @@ def process_story_beats(
         if not source_doc or not source_doc.total_pages:
             raise ValueError("Source document missing or has no total_pages")
 
-        windows = generate_windows(total_pages=source_doc.total_pages)
+        windows = generate_page_windows(total_pages=source_doc.total_pages, window_size=10, overlap=2)
 
         candidate_beats = []
         for window in windows:

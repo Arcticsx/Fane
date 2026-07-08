@@ -10,7 +10,7 @@ from ..config import DATA_DIR
 from ..database import get_db_session
 from ..models import SourceDocument
 from ..models.rpg_sessions import RpgSession
-from ..services.process_documents import process_document
+from ..services.process_documents import process_story_beats
 
 router = APIRouter(prefix="/story", tags=["documents"])
 
@@ -59,7 +59,7 @@ async def create_story_document(
         raise HTTPException(status_code=500, detail=f"Could not save uploaded file: {e}")
 
     background_tasks.add_task(
-        process_document,
+        process_story_beats,
         source_doc_id=source_doc.id,
         session_id=id,
         temp_path=str(file_path),
