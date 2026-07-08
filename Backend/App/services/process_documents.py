@@ -42,13 +42,9 @@ def process_story_beats(
         if not candidate_beats:
             raise ValueError("No beats extracted")
 
-        final_beats = run_reduce_phase(candidate_beats)
+        final_beats = run_reduce_phase(db, session_id, candidate_beats)
 
-        replace_candidates_with_final_beats(db, session_id, final_beats)
-
-        graph_edges = run_graph_phase(final_beats)
-
-        persist_beat_graph(db, session_id, graph_edges)
+        graph_edges = run_graph_phase(db, session_id, final_beats)
 
         if session:
             session.setup_status = "ready"
