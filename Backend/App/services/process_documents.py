@@ -3,7 +3,7 @@ import os
 from ..database import get_db
 from ..models.rpg_sessions import RpgSession, SourceDocument
 from .documents import generate_page_windows
-from .extraction import extract_beats_from_window, replace_candidates_with_final_beats
+from .extraction import extract_beats_from_window, replace_candidates_with_final_beats, save_candidate_beats
 from .beats_reduce import run_reduce_phase
 from .beats_graph import run_graph_phase
 from .graph import persist_beat_graph
@@ -41,6 +41,8 @@ def process_story_beats(
 
         if not candidate_beats:
             raise ValueError("No beats extracted")
+        else: 
+            save_candidate_beats(session_id=session_id, source_doc_id=source_document_id, candidates= candidate_beats)
 
         final_beats = run_reduce_phase(db, session_id, candidate_beats)
 
