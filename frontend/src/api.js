@@ -1,13 +1,10 @@
-const API_BASE = import.meta.env.VITE_API_URL || '';
-const BACKEND_URL = import.meta.env.VITE_API_URL || 'http://localhost:8000';
+const API_BASE = import.meta.env.VITE_API_URL || 'http://localhost:8000';
+const BACKEND_URL = API_BASE;
 
 export function getImageUrl(path) {
   if (!path) return null;
-  // If path is already a full URL, return as-is
   if (path.startsWith('http://') || path.startsWith('https://')) return path;
-  // If path starts with /, construct backend URL
   if (path.startsWith('/')) return `${BACKEND_URL}${path}`;
-  // Otherwise, assume it's a relative path
   return `${BACKEND_URL}/${path}`;
 }
 
@@ -22,7 +19,9 @@ async function handleResponse(res) {
   }
 
   if (!res.ok) {
-    const message = payload?.detail || payload?.message || text || res.statusText;
+    const message = Array.isArray(payload?.detail)
+      ? payload.detail.map(e => `${e.loc?.join('.')} — ${e.msg}`).join(', ')
+      : payload?.detail || payload?.message || text || res.statusText;
     throw new Error(message || 'Request failed');
   }
 
@@ -46,7 +45,7 @@ export const api = {
     if (data.avatar instanceof File) {
       formData.append('avatar', data.avatar);
     }
-    
+
     const res = await fetch(`${API_BASE}/personalities`, {
       method: 'POST',
       body: formData
@@ -73,7 +72,7 @@ export const api = {
     if (data.avatar instanceof File) {
       formData.append('avatar', data.avatar);
     }
-    
+
     const res = await fetch(`${API_BASE}/personalities/${encodeURIComponent(personaKey)}`, {
       method: 'PUT',
       body: formData
@@ -89,18 +88,25 @@ export const api = {
   },
 
   // Sessions
-  async getSessions(personaName) {
-    const res = await fetch(`${API_BASE}/sessions/${encodeURIComponent(personaName)}`);
+  async getRecentSessions() {
+    const res = await fetch(`${API_BASE}/sessions/recent`);
     return handleResponse(res);
   },
 
-  async pickSession(personaName, index) {
+  async getSessions(personaName, personaId) {
+    const qs = personaId ? `?persona_id=${encodeURIComponent(personaId)}` : '';
+    const res = await fetch(`${API_BASE}/sessions/${encodeURIComponent(personaName)}${qs}`);
+    return handleResponse(res);
+  },
+
+  async pickSession(personaName, personaId, index) {
     const res = await fetch(`${API_BASE}/sessions/pick`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ 
-        persona_name: personaName, 
-        index 
+      body: JSON.stringify({
+        persona_name: personaName,
+        persona_id: personaId,
+        index
       })
     });
     return handleResponse(res);
@@ -110,9 +116,9 @@ export const api = {
     const res = await fetch(`${API_BASE}/sessions/load`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ 
-        persona_key: personaKey, 
-        session 
+      body: JSON.stringify({
+        persona_key: personaKey,
+        session: session ? session : null
       })
     });
     return handleResponse(res);
@@ -122,17 +128,17 @@ export const api = {
     const res = await fetch(`${API_BASE}/sessions/save`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ 
+      body: JSON.stringify({
         persona_key: personaKey,
-        messages: messages,
-        context: context,
+        messages,
+        context,
         session_id: sessionId
       })
     });
     return handleResponse(res);
   },
 
-  async deleteSession(personaName, sessionId) {
+  async deleteSession(personaName, personaId, sessionId) {
     const res = await fetch(`${API_BASE}/sessions/${encodeURIComponent(personaName)}/${sessionId}`, {
       method: 'DELETE'
     });
@@ -151,6 +157,84 @@ export const api = {
         session_id: sessionId,
         user_input: userInput
       })
+    });
+    return handleResponse(res);
+  },
+
+  // --- Chronicle ---
+  async createChronicle(data) {
+    const formData = new FormData();
+    formData.append('title', data.title);
+    if (data.synopsis) formData.append('synopsis', data.synopsis);
+    if (data.genre) formData.append('genre', data.genre);
+    if (data.magic_rules_md) formData.append('magic_rules_md', data.magic_rules_md);
+    if (data.context_token_limit) formData.append('context_token_limit', data.context_token_limit);
+    if (data.avatar instanceof File) {
+      formData.append('avatar', data.avatar);
+    }
+
+    const res = await fetch(`${API_BASE}/story`, {
+      method: 'POST',
+      body: formData,
+    });
+    return handleResponse(res);
+  },
+
+  async uploadChronicleDocument(sessionId, file) {
+    const formData = new FormData();
+    formData.append('file', file);
+
+    const res = await fetch(`${API_BASE}/story/${sessionId}/docs`, {
+      method: 'POST',
+      body: formData,
+    });
+    return handleResponse(res);
+  },
+
+  async getDocumentStatus(sessionId, docId) {
+    const res = await fetch(`${API_BASE}/story/${sessionId}/docs/${docId}/status`);
+    return handleResponse(res);
+  }
+  ,
+  // Chronicle helpers
+  async listChronicles() {
+    const res = await fetch(`${API_BASE}/story`);
+    return handleResponse(res);
+  },
+  async getChronicle(id) {
+    const res = await fetch(`${API_BASE}/story/${id}`);
+    return handleResponse(res);
+  },
+  async chatChronicle(id, user_input) {
+    const res = await fetch(`${API_BASE}/story/${id}/chat`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ user_input })
+    });
+    return handleResponse(res);
+  },
+
+  async updateChronicle(id, data) {
+    const formData = new FormData();
+    if (data.title !== undefined) formData.append('title', data.title ?? '');
+    if (data.synopsis !== undefined) formData.append('synopsis', data.synopsis ?? '');
+    if (data.genre !== undefined) formData.append('genre', data.genre ?? '');
+    if (data.magic_rules_md !== undefined) formData.append('magic_rules_md', data.magic_rules_md ?? '');
+    if (data.context_token_limit !== undefined) formData.append('context_token_limit', data.context_token_limit);
+    if (data.avatar instanceof File) {
+      formData.append('avatar', data.avatar);
+    }
+
+    const res = await fetch(`${API_BASE}/story/${encodeURIComponent(id)}`, {
+      method: 'PUT',
+      body: formData,
+    });
+    return handleResponse(res);
+  },
+
+  async deleteChronicle(id) {
+    const res = await fetch(`${API_BASE}/story/${id}`, {
+      method: 'DELETE'
     });
     return handleResponse(res);
   }

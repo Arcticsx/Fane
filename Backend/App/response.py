@@ -1,33 +1,145 @@
-# Handles all LLM API calls via aisuite, with retry logic
-import aisuite as ai
+# Handles all LLM API calls via LangChain, with retry logic
+
 import time
-from config import AISUITE_MODEL, PROVIDER, API_KEY           
+from langchain_openai import ChatOpenAI
 
-def get_client():
-    provider_configs = {}
-    if PROVIDER == "ollama":
-        provider_configs["ollama"] = {"api_url": "http://localhost:11434/"}
-    elif PROVIDER == "deepseek":
-        provider_configs["openai"] = {
-            "api_key": API_KEY,
-            "base_url": "https://api.deepseek.com"
-        }
-    return ai.Client(provider_configs=provider_configs if provider_configs else None)
+try:
+    from .config import AISUITE_MODEL, PROVIDER, API_KEY
+except ImportError:
+    from config import AISUITE_MODEL, PROVIDER, API_KEY
 
-def get_response(messages, retries=3, backoff=2):
-    client = get_client()
+BEAT_SCHEMA = {
+    "type": "array",
+    "items": {
+        "type": "object",
+        "properties": {
+            "classification": {"type": "string", "enum": ["mandatory", "scene"]},
+            "beat_type": {
+                "type": "string",
+                "enum": [
+                    "decision_point", "transition", "dialogue", "combat",
+                    "revelation", "exploration", "reaction", "flashback", "dream_vision",
+                ],
+            },
+            "description": {"type": "string"},
+            "start_page": {"type": "integer"},
+            "end_page": {"type": "integer"},
+            "requires": {"type": "array", "items": {"type": "string"}},
+            "introduces": {"type": "array", "items": {"type": "string"}},
+            "key_dialogues": {"type": "array", "items": {"type": "string"}},
+        },
+        "required": ["classification", "beat_type", "description", "start_page", "end_page"],
+    },
+}
+
+
+
+def get_client(mode):
+    
+    if mode == "chat":
+        if PROVIDER == "deepseek":
+            try:
+                return ChatOpenAI(
+                    model=AISUITE_MODEL,
+                    api_key=API_KEY,
+                    base_url="https://api.deepseek.com",
+                    temperature=0
+                )
+            except Exception as e:
+                print(f"[Warning] deepseek client init failed: {e}")
+                # fall through to stub
+
+        elif PROVIDER == "ollama":
+            try:
+                from langchain_ollama import ChatOllama
+                model_name = AISUITE_MODEL
+                if model_name and ":" in model_name:
+                    model_name = model_name.split(":", 1)[1]
+                return ChatOllama(
+                    model=model_name,
+                    base_url="http://localhost:11434",
+                    temperature=0,
+                )
+            except Exception as e:
+                print(f"[Warning] ollama client init failed: {e}")
+    elif mode == "chronicle":
+        if PROVIDER == "deepseek":
+            try:
+                return ChatOpenAI(
+                    model=AISUITE_MODEL,
+                    api_key=API_KEY,
+                    base_url="https://api.deepseek.com",
+                    temperature=0,
+                    format=BEAT_SCHEMA,
+                )
+            except Exception as e:
+                print(f"[Warning] deepseek client init failed: {e}")
+                # fall through to stub
+
+        elif PROVIDER == "ollama":
+            try:
+                from langchain_ollama import ChatOllama
+                model_name = AISUITE_MODEL
+                if model_name and ":" in model_name:
+                    model_name = model_name.split(":", 1)[1]
+                return ChatOllama(
+                    model=model_name,
+                    base_url="http://localhost:11434",
+                    temperature=0,
+                    num_ctx=12000,
+                    num_predict=4092,   # <-- don't drop this, it was fixing the "one beat per chunk" truncation
+                    format=BEAT_SCHEMA,
+                )
+            except Exception as e:
+                print(f"[Warning] ollama client init failed: {e}")
+        
+
+    # Fallback: when no provider is configured (local development/tests),
+    # return a simple deterministic stub client so `/chat` remains usable.
+    class _StubResponse:
+        def __init__(self, content):
+            self.content = content
+
+    class _StubClient:
+        def invoke(self, prompt):
+            # If prompt is a list of messages, echo the last user message
+            try:
+                if isinstance(prompt, (list, tuple)) and prompt:
+                    last = prompt[-1]
+                    if isinstance(last, dict) and last.get("role") == "user":
+                        return _StubResponse(f"Echo: {last.get('content')}")
+                    if hasattr(last, "content"):
+                        return _StubResponse(f"Echo: {str(last.content)}")
+                return _StubResponse("Echo: Hello from local stub client.")
+            except Exception:
+                return _StubResponse("Echo: Hello from local stub client.")
+
+    return _StubClient()
+
+
+def get_response(prompt, mode, retries=3, backoff=2):
+    client = get_client(mode)
     last_error = None
 
-    TRANSIENT_KEYWORDS = ("rate limit", "429", "500", "502", "503", "connection")
-    TIMEOUT_KEYWORDS = ("timeout", "timed out")
+    TRANSIENT_KEYWORDS = (
+        "rate limit", "429", "500",
+        "502", "503", "connection"
+    )
+
+    TIMEOUT_KEYWORDS = (
+        "timeout", "timed out"
+    )
 
     for attempt in range(1, retries + 1):
         try:
-            response = client.chat.completions.create(model=AISUITE_MODEL, messages=messages)
-            choices = response.choices
-            if not choices or choices[0].message.content is None:
-                raise ValueError("Empty or malformed response from API")
-            return choices[0].message.content
+            response = client.invoke(prompt)
+
+            if not response.content:
+                raise ValueError(
+                    "Empty or malformed response from API"
+                )
+
+            return response.content
 
         except ValueError:
             raise
@@ -36,14 +148,27 @@ def get_response(messages, retries=3, backoff=2):
             last_error = e
             err_str = str(e).lower()
 
-            is_timeout = any(k in err_str for k in TIMEOUT_KEYWORDS)
-            is_transient = any(k in err_str for k in TRANSIENT_KEYWORDS)
+            is_timeout = any(
+                k in err_str for k in TIMEOUT_KEYWORDS
+            )
+
+            is_transient = any(
+                k in err_str for k in TRANSIENT_KEYWORDS
+            )
 
             if is_timeout or is_transient:
                 wait = backoff * attempt * (3 if is_timeout else 1)
-                print(f"[Attempt {attempt}/{retries}] {'Timeout' if is_timeout else 'Transient error'} — retrying in {wait}s: {e}")
+
+                print(
+                    f"[Attempt {attempt}/{retries}] "
+                    f"Retrying in {wait}s: {e}"
+                )
+
                 time.sleep(wait)
+
             else:
                 raise
 
-    raise RuntimeError(f"API call failed after {retries} attempts: {last_error}")
+    raise RuntimeError(
+        f"API call failed after {retries} attempts: {last_error}"
+    )

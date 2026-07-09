@@ -1,7 +1,4 @@
-@tailwind base;
-@tailwind components;
-@tailwind utilities;
-
+@import "tailwindcss";
 
 :root {
   --color-bg: #08020f;
@@ -63,3 +60,26 @@ button {
   color: var(--color-text);
 }
 
+/* ─── Global scrollbar styling (purple theme) ─── */
+::-webkit-scrollbar {
+  width: 6px;
+  height: 6px;
+}
+
+::-webkit-scrollbar-track {
+  background: transparent;
+}
+
+::-webkit-scrollbar-thumb {
+  background: var(--color-accent);
+  border-radius: 3px;
+}
+
+::-webkit-scrollbar-thumb:hover {
+  background: var(--color-accent-2);
+}
+
+* {
+  scrollbar-width: thin;
+  scrollbar-color: var(--color-accent) transparent;
+}

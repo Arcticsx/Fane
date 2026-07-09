@@ -1,5 +1,8 @@
 # Handles conversation summarization and memory trimming
-from response import get_response
+try:
+    from .response import get_response
+except ImportError:
+    from response import get_response
 
 def summarize(messages):
     # Sends the raw message list to the LLM and returns a plain-text summary
@@ -7,7 +10,20 @@ def summarize(messages):
     summary_prompt = [
         {
             "role": "system",
-            "content": "You are a summarization assistant. Summarize the conversation clearly and in detail."
+            "content": """Act as a professional summarizer. Create a concise and comprehensive summary of the messages provided, while adhering to the guidelines enclosed in [ ] below. 
+
+Guidelines:  
+
+[ 
+
+    Create a summary that is detailed, thorough, in-depth, and complex, while maintaining clarity and conciseness. 
+    The summary must cover all the key points and main ideas presented in the original text, while also condensing the information into a concise and easy-to-understand format. 
+    Ensure that the summary includes relevant details and examples that support the main ideas, while avoiding any unnecessary information or repetition. 
+    Rely strictly on the provided text, without including external information. 
+    The length of the summary must be appropriate for the length and complexity of the original text. The length must allow to capture the main points and key details, without being overly long.  
+    Ensure that the summary is well-organized and easy to read, with clear headings and subheadings to guide the reader through each section. Format each section in paragraph form. 
+
+]"""
         },
         {
             "role": "user",

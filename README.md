@@ -1,6 +1,19 @@
-# SARP — Local AI Conversational App
+﻿# fane -- Local AI Conversational App
 
-A CLI application for immersive roleplay conversations with AI-powered characters. Supports multiple LLM providers (OpenAI, Anthropic Claude, Ollama, Deepseek) with persistent sessions and customizable personalities.
+A CLI and web application for immersive roleplay conversations with AI-powered characters. It supports multiple LLM providers (OpenAI, Anthropic Claude, Ollama, and DeepSeek), persistent sessions, and customizable personalities.
+
+## Table of Contents
+
+- [Features](#features)
+- [Requirements](#requirements)
+- [Quick Start](#quick-start)
+- [Usage](#usage)
+- [Project Structure](#project-structure)
+- [Testing](#testing)
+- [Troubleshooting](#troubleshooting)
+- [Contributing](#contributing)
+- [License](#license)
+
 ### **Languages**
 ![Python](https://img.shields.io/badge/Python-3776AB?style=for-the-badge&logo=python&logoColor=white)
 ![HTML5](https://img.shields.io/badge/HTML5-E34F26?style=for-the-badge&logo=html5&logoColor=white)
@@ -14,16 +27,14 @@ A CLI application for immersive roleplay conversations with AI-powered character
 ## Features
 
 - **Multiple AI Providers**: Works with OpenAI, Anthropic Claude, Deepseek and local Ollama models
-- **Persistent Sessions**: Conversations are saved and can be resumed later
+- **Persistent Sessions**: Conversations are saved locally and can be resumed later
 - **Custom Personalities**: Create and select different character personas
 - **Memory Management**: Automatic conversation trimming and summarization
-- **MongoDB Storage**: Session persistence using MongoDB
 
 ## Requirements
 
 - Python 3.11+ (tested on 3.13)
 - Node.js 18+ and npm
-- MongoDB (for session persistence)
 - API key for your chosen provider (OpenAI, Anthropic, or an Ollama-compatible provider)
 
 ## Quick Start
@@ -52,7 +63,6 @@ Create a `.env` file in the project root with the following variables:
 API_KEY=your_api_key_here
 PROVIDER=openai
 MODEL_NAME=gpt-4o-mini
-MONGO_URI=mongodb://localhost:27017
 ```
 
 **Provider Options:**
@@ -83,27 +93,41 @@ npm run frontend
 
 ## Project Structure
 
-```
+```text
 Backend/
-├── App/
-│   ├── main.py            # Entry point
-│   ├── chat.py            # Main chat loop and orchestration
-│   ├── cli.py             # CLI utilities (formatting, input/output)
-│   ├── config.py          # Configuration and environment loading
-│   ├── database.py        # Session persistence
-│   ├── memory.py          # Conversation summarization and trimming
-│   ├── personalities.py   # Personality definitions and selection
-│   ├── response.py        # LLM provider integration
-│   └── api/
-│       └── router.py      # FastAPI endpoints
-└── tests/
-    ├── conftest.py        # Test fixtures
-    ├── test_personalities.py
-    └── test_memory.py
+â”œâ”€â”€ App/
+â”‚   â”œâ”€â”€ api/
+â”‚   â”‚   â”œâ”€â”€ chat_router.py
+â”‚   â”‚   â”œâ”€â”€ chronicle_router.py
+â”‚   â”‚   â””â”€â”€ documents_router.py
+â”‚   â”œâ”€â”€ models/
+â”‚   â”‚   â”œâ”€â”€ dbbase.py
+â”‚   â”‚   â”œâ”€â”€ models.py
+â”‚   â”‚   â””â”€â”€ rpg_sessions.py
+â”‚   â”œâ”€â”€ services/
+â”‚   â”‚   â”œâ”€â”€ documents.py
+â”‚   â”‚   â”œâ”€â”€ ingestion.py
+â”‚   â”‚   â””â”€â”€ vectorstore.py
+â”‚   â”œâ”€â”€ main.py
+â”‚   â”œâ”€â”€ chat.py
+â”‚   â”œâ”€â”€ cli.py
+â”‚   â”œâ”€â”€ config.py
+â”‚   â”œâ”€â”€ database.py
+â”‚   â”œâ”€â”€ memory.py
+â”‚   â”œâ”€â”€ personalities.py
+â”‚   â””â”€â”€ response.py
+â”œâ”€â”€ tests/
+â”‚   â”œâ”€â”€ conftest.py
+â”‚   â””â”€â”€ test_*.py
 
 frontend/
-├── src/
-└── package.json
+â”œâ”€â”€ src/
+â”‚   â”œâ”€â”€ components/
+â”‚   â”œâ”€â”€ api.js
+â”‚   â”œâ”€â”€ App.jsx
+â”‚   â””â”€â”€ index.jsx
+â”œâ”€â”€ index.html
+â””â”€â”€ package.json
 ```
 
 ## Dependencies
@@ -117,7 +141,7 @@ frontend/
 Run the test suite:
 
 ```powershell
-cd backend
+cd Backend
 pytest
 ```
 
@@ -130,9 +154,6 @@ If you see a "Circular reference detected" error, ensure the `messages` list pas
 The app uses summarization and trimming to manage conversation history. If sessions grow unexpectedly large:
 - Increase trimming frequency in `memory.py`
 - Shorten saved history
-
-### MongoDB Connection Issues
-Ensure MongoDB is running and accessible at the `MONGO_URI` specified in your `.env` file.
 
 ## Contributing
 
