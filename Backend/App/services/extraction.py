@@ -164,7 +164,7 @@ def extract_beats_from_window(session_id, source_doc_id, start_page, end_page):
     approx_tokens = len(prompt) // 4  # rough chars-to-tokens estimate
     print(f"[DEBUG] window {start_page}-{end_page}: ~{approx_tokens} tokens, {len(chunks)} chunks")
     
-    response = get_response(prompt)
+    response = get_response(prompt, mode="chronicle")
     print(response)
     beats = _parse_json_response(response)
     

@@ -301,7 +301,7 @@ def chat(body: ChatRequest):
     messages = body.messages + [{"role": "user", "content": body.user_input}]
 
     try:
-        assistant_msg = get_response(messages)
+        assistant_msg = get_response(messages, mode="chat")
     except RuntimeError as e:
         raise HTTPException(status_code=503, detail=str(e))
 

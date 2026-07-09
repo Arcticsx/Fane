@@ -34,35 +34,65 @@ BEAT_SCHEMA = {
 
 
 
-def get_client():
-    if PROVIDER == "deepseek":
-        try:
-            return ChatOpenAI(
-                model=AISUITE_MODEL,
-                api_key=API_KEY,
-                base_url="https://api.deepseek.com",
-                temperature=0
-            )
-        except Exception as e:
-            print(f"[Warning] deepseek client init failed: {e}")
-            # fall through to stub
+def get_client(mode):
+    
+    if mode == "chat":
+        if PROVIDER == "deepseek":
+            try:
+                return ChatOpenAI(
+                    model=AISUITE_MODEL,
+                    api_key=API_KEY,
+                    base_url="https://api.deepseek.com",
+                    temperature=0
+                )
+            except Exception as e:
+                print(f"[Warning] deepseek client init failed: {e}")
+                # fall through to stub
 
-    elif PROVIDER == "ollama":
-        try:
-            from langchain_ollama import ChatOllama
-            model_name = AISUITE_MODEL
-            if model_name and ":" in model_name:
-                model_name = model_name.split(":", 1)[1]
-            return ChatOllama(
-                model=model_name,
-                base_url="http://localhost:11434",
-                temperature=0,
-                num_ctx=12000,
-                num_predict=4092,   # <-- don't drop this, it was fixing the "one beat per chunk" truncation
-                format=BEAT_SCHEMA,
-            )
-        except Exception as e:
-            print(f"[Warning] ollama client init failed: {e}")
+        elif PROVIDER == "ollama":
+            try:
+                from langchain_ollama import ChatOllama
+                model_name = AISUITE_MODEL
+                if model_name and ":" in model_name:
+                    model_name = model_name.split(":", 1)[1]
+                return ChatOllama(
+                    model=model_name,
+                    base_url="http://localhost:11434",
+                    temperature=0,
+                )
+            except Exception as e:
+                print(f"[Warning] ollama client init failed: {e}")
+    elif mode == "chronicle":
+        if PROVIDER == "deepseek":
+            try:
+                return ChatOpenAI(
+                    model=AISUITE_MODEL,
+                    api_key=API_KEY,
+                    base_url="https://api.deepseek.com",
+                    temperature=0,
+                    format=BEAT_SCHEMA,
+                )
+            except Exception as e:
+                print(f"[Warning] deepseek client init failed: {e}")
+                # fall through to stub
+
+        elif PROVIDER == "ollama":
+            try:
+                from langchain_ollama import ChatOllama
+                model_name = AISUITE_MODEL
+                if model_name and ":" in model_name:
+                    model_name = model_name.split(":", 1)[1]
+                return ChatOllama(
+                    model=model_name,
+                    base_url="http://localhost:11434",
+                    temperature=0,
+                    num_ctx=12000,
+                    num_predict=4092,   # <-- don't drop this, it was fixing the "one beat per chunk" truncation
+                    format=BEAT_SCHEMA,
+                )
+            except Exception as e:
+                print(f"[Warning] ollama client init failed: {e}")
+        
 
     # Fallback: when no provider is configured (local development/tests),
     # return a simple deterministic stub client so `/chat` remains usable.
@@ -87,8 +117,8 @@ def get_client():
     return _StubClient()
 
 
-def get_response(prompt, retries=3, backoff=2):
-    client = get_client()
+def get_response(prompt, mode, retries=3, backoff=2):
+    client = get_client(mode)
     last_error = None
 
     TRANSIENT_KEYWORDS = (
