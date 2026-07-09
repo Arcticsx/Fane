@@ -39,11 +39,6 @@ def get_db():
         db.close()
 
 
-def get_db_session():
-    """FastAPI dependency: yields an actual Session (use with Depends)."""
-    with get_db() as db:
-        yield db
-
 
 def get_db_session():
     """FastAPI dependency: yields an actual Session (use with Depends)."""

@@ -10,6 +10,7 @@ except ImportError:
 
 import json
 import re
+import sys
 from ..database import get_db
 from ..models.rpg_sessions import StoryBeat
 from typing import List, Dict, Any, Set
@@ -215,36 +216,37 @@ def save_candidate_beats(source_doc_id: str, session_id: str, candidates: list[d
     if not candidates:
         return 0
  
-    db = next(get_db())
     saved = 0
- 
-    try:
-        for order, c in enumerate(candidates):
-            if not isinstance(c, dict):
-                continue
+    with get_db() as db:
+        try:
+            
+            for order, c in enumerate(candidates):
+                if not isinstance(c, dict):
+                    continue
 
-            beat = StoryBeat(
-                session_id=session_id,
-                source_document_id=source_doc_id,
-                beat_type=c.get("beat_type"),
-                description=c.get("description"),
-                status="candidate",
-                starting_page=_coerce_int(c.get("start_page")),
-                ending_page=_coerce_int(c.get("end_page")),
-                beat_order = order,
-                requires=json.dumps(c.get("requires", [])),
-                introduces=json.dumps(c.get("introduces", [])),
-                key_dialogues=json.dumps(c.get("key_dialogues", [])),
-            )
-            db.add(beat)
-            saved += 1
- 
-        db.commit()
-    except Exception:
-        db.rollback()
-        raise
-    finally:
-        db.close()
+                beat = StoryBeat(
+                    session_id=session_id,
+                    source_document_id=source_doc_id,
+                    beat_type=c.get("beat_type"),
+                    description=c.get("description"),
+                    status="candidate",
+                    starting_page=_coerce_int(c.get("start_page")),
+                    ending_page=_coerce_int(c.get("end_page")),
+                    beat_order = order,
+                    requires=json.dumps(c.get("requires", [])),
+                    introduces=json.dumps(c.get("introduces", [])),
+                    key_dialogues=json.dumps(c.get("key_dialogues", [])),
+                )
+                db.add(beat)
+                saved += 1
+    
+            db.commit()
+        except Exception as e:
+            db.rollback()
+            print(f"[extraction.save_candidate_beats] Failed to save candidate beats for {source_doc_id}: {e}", file=sys.stderr)
+            raise
+        finally:
+            db.close()
  
     return saved
 

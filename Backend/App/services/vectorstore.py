@@ -1,3 +1,4 @@
+import sys
 try:
     from ..config import CHROMA_PERSIST_DIR
 except ImportError:
@@ -6,10 +7,14 @@ import chromadb
 import uuid
 from typing import List, Dict, Any, Optional
 
-# NOTE: directory must exist before the PersistentClient is created against it,
-# and Path.mkdir() takes `exist_ok`, not `exist`.
-CHROMA_PERSIST_DIR.mkdir(exist_ok=True)
-_client = chromadb.PersistentClient(path=CHROMA_PERSIST_DIR)
+ # NOTE: directory must exist before the PersistentClient is created against it,
+ # and Path.mkdir() takes `exist_ok`, not `exist`.
+try:
+    CHROMA_PERSIST_DIR.mkdir(exist_ok=True)
+    _client = chromadb.PersistentClient(path=CHROMA_PERSIST_DIR)
+except Exception as e:
+    print(f"[vectorstore] Failed to initialize chromadb client at {CHROMA_PERSIST_DIR}: {e}", file=sys.stderr)
+    _client = None
 
 
 def get_or_create_collection(session_id: str, collection_type: str):
@@ -61,12 +66,16 @@ def save_chunks_to_chromadb(
     ]
     ids = [f"{session_id}_{uuid.uuid4()}" for _ in chunks]
 
-    collection.add(
-        documents=documents,
-        metadatas=metadatas,
-        embeddings=embeddings,
-        ids=ids,
-    )
+    try:
+        collection.add(
+            documents=documents,
+            metadatas=metadatas,
+            embeddings=embeddings,
+            ids=ids,
+        )
+    except Exception as e:
+        print(f"[vectorstore.save_chunks_to_chromadb] Failed to add chunks for session {session_id}: {e}", file=sys.stderr)
+        raise
 
     return {
         "chunks_saved": len(chunks),

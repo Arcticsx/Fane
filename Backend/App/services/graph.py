@@ -1,5 +1,6 @@
 from bisect import bisect_left, bisect_right
 from dataclasses import dataclass
+import sys
 from ..database import get_db
 from ..models.rpg_sessions import GraphEdge
 
@@ -109,4 +110,5 @@ def persist_beat_graph(
 
     except Exception as e:
         db.rollback()
+        print(f"[graph.persist_beat_graph] Failed to persist beat graph for session {session_id}: {e}", file=sys.stderr)
         raise RuntimeError(f"Failed to persist beat graph for session {session_id}: {e}") from e

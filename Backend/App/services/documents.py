@@ -1,4 +1,5 @@
 import re
+import sys
 import pymupdf4llm
 from langchain_text_splitters import RecursiveCharacterTextSplitter, MarkdownHeaderTextSplitter
 from langchain_core.documents import Document
@@ -21,14 +22,16 @@ def normalize_text(text):
 def convert_to_markdown(file_path):
     try:
         return pymupdf4llm.to_markdown(file_path, page_chunks=True)
-    except Exception:
+    except Exception as e:
+        print(f"[documents.convert_to_markdown] primary conversion failed for {file_path}: {e}", file=sys.stderr)
         # Fallback: if PDF-to-markdown fails (missing libs or corrupt PDF),
         # try a minimal text extraction to keep processing moving.
         try:
             with open(file_path, "rb") as f:
                 raw = f.read()
             text = raw.decode("utf-8", errors="ignore")
-        except Exception:
+        except Exception as e2:
+            print(f"[documents.convert_to_markdown] fallback text extraction failed for {file_path}: {e2}", file=sys.stderr)
             text = ""
 
         # Return a single-page-like structure compatible with the rest of the pipeline
@@ -45,6 +48,7 @@ def _get_embedding_model():
             else:
                 _embedding_model = SentenceTransformer(EMBEDDING_MODEL)
         except Exception:
+            print(f"[documents._get_embedding_model] failed to load embedding model: {EMBEDDING_MODEL}", file=sys.stderr)
             _embedding_model = None
     return _embedding_model
 
@@ -57,6 +61,7 @@ def token_length(text):
     try:
         return len(model.tokenizer.encode(text))
     except Exception:
+        print("[documents.token_length] tokenizer.encode failed, falling back to word count", file=sys.stderr)
         return max(1, len(text.split()))
 
 def chunk_headers(pages):
