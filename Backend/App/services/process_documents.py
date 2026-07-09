@@ -7,6 +7,7 @@ from .vectorstore import save_chunks_to_chromadb
 from .extraction import extract_beats_from_window, replace_candidates_with_final_beats
 from .beats_reduce import run_reduce_phase
 from .beats_graph import run_graph_phase
+from .process_story_beats import process_story_beats
 
 def process_document(
     source_doc_id: str,
@@ -55,6 +56,8 @@ def process_document(
             if source_doc:
                     source_doc.error_message = str(e)[:1000]
                     db.commit()
+        
+        process_story_beats(session_id=session_id, source_document_id=source_doc_id)
 
     except Exception as e:
             source_doc = db.query(SourceDocument).filter(SourceDocument.id == source_doc_id).first()
@@ -69,5 +72,4 @@ def process_document(
                     os.remove(temp_path)
                 except OSError:
                     pass
-
 
