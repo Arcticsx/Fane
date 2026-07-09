@@ -8,6 +8,31 @@ try:
 except ImportError:
     from config import AISUITE_MODEL, PROVIDER, API_KEY
 
+BEAT_SCHEMA = {
+    "type": "array",
+    "items": {
+        "type": "object",
+        "properties": {
+            "classification": {"type": "string", "enum": ["mandatory", "scene"]},
+            "beat_type": {
+                "type": "string",
+                "enum": [
+                    "decision_point", "transition", "dialogue", "combat",
+                    "revelation", "exploration", "reaction", "flashback", "dream_vision",
+                ],
+            },
+            "description": {"type": "string"},
+            "start_page": {"type": "integer"},
+            "end_page": {"type": "integer"},
+            "requires": {"type": "array", "items": {"type": "string"}},
+            "introduces": {"type": "array", "items": {"type": "string"}},
+            "key_dialogues": {"type": "array", "items": {"type": "string"}},
+        },
+        "required": ["classification", "beat_type", "description", "start_page", "end_page"],
+    },
+}
+
+
 
 def get_client():
     if PROVIDER == "deepseek":
@@ -25,19 +50,19 @@ def get_client():
     elif PROVIDER == "ollama":
         try:
             from langchain_ollama import ChatOllama
-            # Ollama expects a model name without provider prefix (no colon),
-            # but AISUITE_MODEL may be in the form 'ollama:MODEL'. Strip prefix.
             model_name = AISUITE_MODEL
             if model_name and ":" in model_name:
                 model_name = model_name.split(":", 1)[1]
-
             return ChatOllama(
                 model=model_name,
-                base_url="http://localhost:11434"
+                base_url="http://localhost:11434",
+                temperature=0,
+                num_ctx=12000,
+                num_predict=4092,   # <-- don't drop this, it was fixing the "one beat per chunk" truncation
+                format=BEAT_SCHEMA,
             )
         except Exception as e:
             print(f"[Warning] ollama client init failed: {e}")
-            # fall through to stub
 
     # Fallback: when no provider is configured (local development/tests),
     # return a simple deterministic stub client so `/chat` remains usable.

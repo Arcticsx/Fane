@@ -17,98 +17,41 @@ from typing import List, Dict, Any, Set
 from difflib import get_close_matches
 
 SYSTEM_PROMPT = '''
-You are a Narrative Architect. Extract ALL story beats from the given novel text, covering pages {start_page}-{end_page}.
+You are a Narrative Architect. Extract ALL story beats from the novel text below, covering pages {start_page}-{end_page}.
+Skip non-story text (Acknowledgements, Author's Note, Table of Contents, etc.) and return an empty list for it.
 
-If the text isn't part of the story (Acknowledgements, Author's Note, Editor's Note, Table of Contents, etc.), skip it and return an empty list.
+A beat is any unit that advances plot, develops character, builds world, or is a meaningful interaction. Extract every beat, don't cap the count.
 
-## What is a story beat?
+classification:
+- "mandatory": irreversible, plot-required. Skipping it breaks later events.
+- "scene": optional flavor, skippable without breaking plot.
 
-Any narrative unit that advances the plot, develops a character, builds the world, or provides meaningful interaction with the environment/NPCs. Extract every beat — don't cap the count — and classify each:
+beat_type (pick one): decision_point, transition, dialogue, combat, revelation, exploration, reaction, flashback, dream_vision
 
-- **mandatory**: an irreversible event the main plot requires. Skipping it breaks later events. E.g. "The hero accepts the quest."
-- **scene**: optional but meaningful flavor — conversation, exploration, atmosphere. Can be skipped without breaking the plot. E.g. "The hero chats with the innkeeper about the weather."
-
-Rule of thumb: if skipping it makes a later event illogical, it's mandatory; if it only adds flavor, it's a scene.
-
-## Beat types (pick one per beat)
-
-- `decision_point` — meaningful choice affecting plot ("Will you accept the quest?")
-- `transition` — travel, time passing, scene change ("You ride three days to the mountains.")
-- `dialogue` — conversation conveying info or advancing relationships
-- `combat` — fight, duel, physical confrontation
-- `revelation` — discovery of crucial info, object, or truth
-- `exploration` — investigating a location, object, or situation
-- `reaction` — world/NPCs react to prior player action, no player input
-- `flashback` — fixed memory sequence, player cannot change it
-- `dream_vision` — fixed dream, prophecy, or hallucination
-
-## Output format
-
-Return a JSON list, beats in the order they occur:
-
+Return ONLY a JSON list, no prose before or after. Each beat must use exactly these keys:
 ```json
 [
-  {
+{{
     "classification": "mandatory",
     "beat_type": "decision_point",
-    "description": "One-sentence, immutable summary.",
+    "description": "Two-sentences, immutable summary.",
     "start_page": 12,
     "end_page": 14,
     "requires": ["asset1"],
     "introduces": ["asset2"],
     "key_dialogues": ["Verbatim quote", "..."]
-  }
+}}
 ]
 ```
 
-Field notes:
-- `description`: immutable — must never change during gameplay.
-- `start_page`/`end_page`: must stay within {start_page}-{end_page}; ranges must not overlap between beats. Use the inline "[page N]" markers in the text to determine these.
-- `requires`: tags that must already exist from earlier beats, anywhere in the story so far. `[]` if none.
-- `introduces`: new tags this beat creates (knowledge, items, relationships, state changes). `[]` if none.
-- `key_dialogues`: up to 5 verbatim quotes critical to the beat. `[]` if none.
+Rules:
+- description: immutable, never changes during gameplay.
+- start_page/end_page: must stay within {start_page}-{end_page}, no overlapping ranges. Use "[page N]" markers in the text.
+- requires: tags needed from earlier beats (anywhere in story so far). [] if none.
+- introduces: new tags this beat creates. [] if none.
+- key_dialogues: up to 5 verbatim quotes. [] if none.
 
-## Example
-
-Input (pages 10-15): "The elder handed the map to the hero. 'You must take this,' he said. 'The Shadow Dragon grows stronger.' The hero hesitated, then nodded. They packed their bags and left the village at dawn. On the road, a stranger approached and warned them of the dark forest."
-
-Output:
-```json
-[
-  {
-    "classification": "mandatory",
-    "beat_type": "decision_point",
-    "description": "The hero decides whether to accept the elder's quest and take the map.",
-    "start_page": 10,
-    "end_page": 11,
-    "requires": [],
-    "introduces": ["quest_accepted"],
-    "key_dialogues": ["You must take this.", "The Shadow Dragon grows stronger."]
-  },
-  {
-    "classification": "scene",
-    "beat_type": "transition",
-    "description": "The hero packs supplies and leaves the village.",
-    "start_page": 12,
-    "end_page": 12,
-    "requires": ["quest_accepted"],
-    "introduces": ["left_village"],
-    "key_dialogues": []
-  },
-  {
-    "classification": "scene",
-    "beat_type": "dialogue",
-    "description": "A stranger warns the hero about the dangers of the dark forest.",
-    "start_page": 13,
-    "end_page": 15,
-    "requires": ["left_village"],
-    "introduces": ["forest_warning"],
-    "key_dialogues": ["Beware the dark forest, traveler."]
-  }
-]
-```
-
-## Now extract beats from the following text:
+## Text to extract from:
 
 {pages_text}
 '''
@@ -121,13 +64,58 @@ def _parse_json_response(response):
     if not isinstance(response, str):
         return None
 
-    clean_response = re.sub(r'```json\s*', '', response)
-    clean_response = re.sub(r'```\s*', '', clean_response)
+    # Strip markdown fences if present
+    text = re.sub(r'```json\s*', '', response)
+    text = re.sub(r'```\s*', '', text)
+    text = text.strip()
+
+    # Try parsing as-is first (covers clean responses with no surrounding prose)
+    try:
+        return json.loads(text)
+    except json.JSONDecodeError:
+        pass
+
+    # Fall back to extracting the first JSON array or object from the text,
+    # in case the model wrapped it in explanatory prose.
+    match = re.search(r'(\[.*\]|\{.*\})', text, re.DOTALL)
+    if not match:
+        return None
 
     try:
-        return json.loads(clean_response.strip())
+        return json.loads(match.group(1))
     except json.JSONDecodeError:
         return None
+
+VALID_BEAT_TYPES = {
+    "decision_point", "transition", "dialogue", "combat",
+    "revelation", "exploration", "reaction", "flashback", "dream_vision",
+}
+VALID_CLASSIFICATIONS = {"mandatory", "scene"}
+
+def _normalize_beat(beat: dict) -> dict | None:
+    if not isinstance(beat, dict):
+        return None
+    if not beat.get("description"):
+        return None
+
+    beat_type = beat.get("beat_type")
+    if beat_type not in VALID_BEAT_TYPES:
+        beat_type = "reaction"  # safe fallback, or log and drop instead
+
+    classification = beat.get("classification")
+    if classification not in VALID_CLASSIFICATIONS:
+        classification = "scene"
+
+    return {
+        "classification": classification,
+        "beat_type": beat_type,
+        "description": beat["description"],
+        "start_page": beat.get("start_page"),
+        "end_page": beat.get("end_page"),
+        "requires": beat.get("requires", []),
+        "introduces": beat.get("introduces", []),
+        "key_dialogues": beat.get("key_dialogues", []),
+    }
 
 
 def _coerce_int(value):
@@ -173,22 +161,20 @@ def extract_beats_from_window(session_id, source_doc_id, start_page, end_page):
         end_page=end_page,
         pages_text=pages_text,
     )
-
+    approx_tokens = len(prompt) // 4  # rough chars-to-tokens estimate
+    print(f"[DEBUG] window {start_page}-{end_page}: ~{approx_tokens} tokens, {len(chunks)} chunks")
+    
     response = get_response(prompt)
+    print(response)
     beats = _parse_json_response(response)
-
-    if beats is None:
+    
+    if beats is None or not isinstance(beats, list):
         print(f"Failed to parse beats for pages {start_page}-{end_page}: invalid JSON response")
         return []
 
-    if not isinstance(beats, list):
-        print(
-            f"Unexpected beats shape for pages {start_page}-{end_page}: "
-            f"expected list, got {type(beats).__name__}"
-        )
-        return []
-
-    return beats
+    normalized = [_normalize_beat(b) for b in beats]
+    normalized = [b for b in normalized if b is not None]
+    return normalized
 
 
 

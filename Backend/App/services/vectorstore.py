@@ -100,7 +100,6 @@ def query_chroma_by_page_range(
     filter) rather than collection.query() (a similarity search), since
     there is no meaningful query text here -- we want everything in the
     range, not the top-k nearest to an empty/default embedding.
-
     Returns a list of dicts: {"text": str, "page": int, "start_index": int,
     "section": str, "subsection": str}
     """
@@ -111,15 +110,16 @@ def query_chroma_by_page_range(
 
     results = collection.get(
         where={
-            "page": {"$gte": start_page, "$lte": end_page}
+            "$and": [
+                {"page": {"$gte": start_page}},
+                {"page": {"$lte": end_page}},
+            ]
         },
         limit=n_results,
         include=["documents", "metadatas"],
     )
-
     docs = results.get("documents") or []
     metas = results.get("metadatas") or []
-
     formatted = []
     for i, doc in enumerate(docs):
         meta = metas[i] if i < len(metas) else {}
@@ -130,7 +130,6 @@ def query_chroma_by_page_range(
             "section": meta.get("section"),
             "subsection": meta.get("subsection"),
         })
-
     formatted.sort(key=lambda x: (x.get("page") or 0, x.get("start_index") or 0))
     return formatted
 

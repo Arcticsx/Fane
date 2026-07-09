@@ -25,10 +25,18 @@ def process_document(
                 db.commit()
 
             try:
+                print(f"[process_document] Path = {temp_path}")
                 doc_meta = get_document_metadata(temp_path)
             except Exception as e:
                 print(f"[process_document] Error getting metadata for {temp_path}: {e}", file=sys.stderr)
                 raise
+            
+            if doc_meta:
+                source_doc.total_pages = doc_meta["total_pages"]
+                source_doc.file_size_bytes = doc_meta["file_size"]
+                print(f"Inserted document metadata")
+            else:
+                print(f"No document metadata")
 
             try:
                 chunks = chunk_document(temp_path, chunksize=500, overlap=50)
