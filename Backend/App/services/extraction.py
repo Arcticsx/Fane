@@ -218,6 +218,7 @@ def save_candidate_beats(source_doc_id: str, session_id: str, candidates: list[d
                     status="candidate",
                     starting_page=_coerce_int(c.get("start_page")),
                     ending_page=_coerce_int(c.get("end_page")),
+                    classification = c.get("classification"),
                     beat_order = order,
                     requires=json.dumps(c.get("requires", [])),
                     introduces=json.dumps(c.get("introduces", [])),
