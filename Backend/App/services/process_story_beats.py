@@ -62,7 +62,7 @@ def process_story_beats(
                 else:
                     save_candidate_beats(candidates=candidate_beats, session_id=session_id, source_doc_id=source_document_id)
 
-                final_beats = run_reduce_phase(db, session_id, candidate_beats)
+                final_beats = run_reduce_phase(db, session_id, candidate_beats, source_document_id)
 
                 graph_edges = run_graph_phase(db, session_id, final_beats)
 
