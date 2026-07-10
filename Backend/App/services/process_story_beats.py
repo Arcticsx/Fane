@@ -49,6 +49,7 @@ def process_story_beats(
                         if "connection refused" in str(e).lower() or "server disconnected" in str(e).lower():
                             print(f"[process_story_beats] Ollama appears unresponsive, backing off 15s", file=sys.stderr)
                             time.sleep(15)
+                            beats = extract_beats_from_window(session_id, source_document_id, start_page, end_page)
                         if consecutive_failures >= 5:
                             raise RuntimeError(
                                 f"Too many consecutive extraction failures ({consecutive_failures}); "

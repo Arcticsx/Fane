@@ -15,6 +15,7 @@ from ..database import get_db
 from ..models.rpg_sessions import StoryBeat
 from typing import List, Dict, Any, Set
 from difflib import get_close_matches
+from ..config import _dbg
 
 SYSTEM_PROMPT = '''
 You are a Narrative Architect. Extract ALL story beats from the novel text below, covering pages {start_page}-{end_page}.
@@ -218,6 +219,7 @@ def save_candidate_beats(source_doc_id: str, session_id: str, candidates: list[d
                     status="candidate",
                     starting_page=_coerce_int(c.get("start_page")),
                     ending_page=_coerce_int(c.get("end_page")),
+                    classification = c.get("classification"),
                     beat_order = order,
                     requires=json.dumps(c.get("requires", [])),
                     introduces=json.dumps(c.get("introduces", [])),
@@ -238,7 +240,6 @@ def save_candidate_beats(source_doc_id: str, session_id: str, candidates: list[d
 
 def cluster_candidates(candidates: List[Dict], cluster_size: int = 18, overlap: int = 5) -> List[List[Dict]]:
     
-    # 1. Sort globally
     sorted_candidates = sort_candidates(candidates)  # uses (start_page, end_page, order)
     
     clusters = []
@@ -256,11 +257,11 @@ def cluster_candidates(candidates: List[Dict], cluster_size: int = 18, overlap: 
 def reduce_cluster(cluster: List[Dict]) -> List[Dict]:
 
     prompt = f"""
-You will receive a list of candidate beats (15–20) with inconsistent requires and introduces tags.
+You will receive a list of candidate beats with inconsistent requires and introduces tags.
 Your first task is to unify these tags into a single canonical vocabulary within this cluster.
 For example, if one beat uses 'sword', another uses 'sword_of_light', you MUST replace them all with 'sword_of_light'.
 Then, deduplicate and merge overlapping/duplicate beats within this cluster.
-Output the final 10–12 definitive beats for this section.
+Output the final definitive beats for this section.
 
 Candidate beats (JSON):
 {json.dumps(cluster, indent=2)}
@@ -276,15 +277,28 @@ Output ONLY a JSON list of the cleaned beats, each with:
 
 Do NOT include 'order' – that will be assigned later.
 """
-    response = get_response(prompt)
+    prompt_chars = len(prompt)
+    _dbg(f"reduce_cluster: input={len(cluster)} candidates, prompt_len={prompt_chars} chars "
+         f"(~{prompt_chars // 4} tokens)")
+
+    response = get_response(prompt, mode="chronicle")
+    _dbg(f"reduce_cluster: raw response_len={len(response)} chars, "
+         f"head={response[:120]!r}")
+
     # Clean markdown fences
     clean = re.sub(r'```json\s*', '', response)
     clean = re.sub(r'```\s*', '', clean)
+
     try:
-        return json.loads(clean.strip())
-    except json.JSONDecodeError:
+        parsed = json.loads(clean.strip())
+        _dbg(f"reduce_cluster: parsed OK, output={len(parsed)} beats "
+             f"(input was {len(cluster)})")
+        return parsed
+    except json.JSONDecodeError as je:
+        print(f"Cluster LLM failed, returning original cluster", file=sys.stderr)
+        _dbg(f"reduce_cluster: JSONDecodeError={je}, cleaned_response_len={len(clean)}, "
+             f"cleaned_tail={clean[-200:]!r}")
         # fallback: return the original cluster (better than losing data)
-        print("Cluster LLM failed, returning original cluster")
         return cluster
     
 def merge_clusters(cleaned_clusters: List[List[Dict]]) -> List[Dict]:
@@ -461,7 +475,6 @@ def replace_candidates_with_final_beats(
                 introduces=json.dumps(beat_data.get("introduces", [])),
                 key_dialogues=json.dumps(beat_data.get("key_dialogues", [])),
                 retry_count=0,
-                importance=beat_data.get("importance", 1),
             ))
             inserted += 1
 

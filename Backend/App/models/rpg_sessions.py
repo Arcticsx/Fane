@@ -194,7 +194,7 @@ class StoryBeat(Base):
     retry_count = Column(Integer, default=0)  # number of times this beat has been retried
     last_attempt = Column(Text, nullable=True) 
     beat_order = Column(Integer)  # renamed from 'order' — reserved word, avoid even quoted
-    importance = Column(Integer, default=1)  # scale of 1-5, 5 being most important
+    classification = Column(String)
     introduces = Column(Text, nullable=True)  # optional reference to a new character or lore entry introduced by this beat
     requires = Column(Text, nullable=True)  # optional reference to a character or lore entry required for this beat
     key_dialogues = Column(Text, nullable=True)
