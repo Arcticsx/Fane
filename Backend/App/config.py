@@ -2,6 +2,7 @@
 from dotenv import load_dotenv
 import os
 from pathlib import Path
+import sys
 
 load_dotenv()
 
@@ -35,3 +36,6 @@ Behavior:
 
 Critical:
 - Never write {{user}} or {{char}} — use "you" and your own name directly"""
+
+def _dbg(msg):
+    print(f"[DEBUG] {msg}", file=sys.stderr)
