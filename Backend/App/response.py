@@ -24,6 +24,7 @@ BEAT_SCHEMA = {
             "description": {"type": "string"},
             "start_page": {"type": "integer"},
             "end_page": {"type": "integer"},
+            "characters": {"type": "array", "items": {"type": "string"}},
             "requires": {"type": "array", "items": {"type": "string"}},
             "introduces": {"type": "array", "items": {"type": "string"}},
             "key_dialogues": {"type": "array", "items": {"type": "string"}},

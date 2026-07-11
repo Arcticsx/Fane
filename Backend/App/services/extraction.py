@@ -40,16 +40,17 @@ Return ONLY a JSON list, no prose before or after. Each beat must use exactly th
     "end_page": 14,
     "requires": ["asset1"],
     "introduces": ["asset2"],
+    "characters": ["Character Name", "..."],
     "key_dialogues": ["Verbatim quote", "..."]
 }}
 ]
 ```
-
 Rules:
 - description: immutable, never changes during gameplay.
 - start_page/end_page: must stay within {start_page}-{end_page}, no overlapping ranges. Use "[page N]" markers in the text.
 - requires: tags needed from earlier beats (anywhere in story so far). [] if none.
 - introduces: new tags this beat creates. [] if none.
+- characters: Names of every character present or active in this beat, using the most complete form the text gives you (e.g. "Percy Jackson" not "he" or "the boy"). [] if none.
 - key_dialogues: up to 5 verbatim quotes. [] if none.
 
 ## Text to extract from:
@@ -220,6 +221,7 @@ def save_candidate_beats(source_doc_id: str, session_id: str, candidates: list[d
                     starting_page=_coerce_int(c.get("start_page")),
                     ending_page=_coerce_int(c.get("end_page")),
                     classification = c.get("classification"),
+                    characters = c.get("characters"),
                     beat_order = order,
                     requires=json.dumps(c.get("requires", [])),
                     introduces=json.dumps(c.get("introduces", [])),
@@ -260,6 +262,7 @@ def reduce_cluster(cluster: List[Dict]) -> List[Dict]:
 You will receive a list of candidate beats with inconsistent requires and introduces tags.
 Your first task is to unify these tags into a single canonical vocabulary within this cluster.
 For example, if one beat uses 'sword', another uses 'sword_of_light', you MUST replace them all with 'sword_of_light'.
+Apply the same canonicalization to character names — if one beat uses 'Nyx' and another uses 'Nyx Shadowbane' or 'the assassin', unify them under a single canonical name per character.
 Then, deduplicate and merge overlapping/duplicate beats within this cluster.
 Output the final definitive beats for this section.
 
@@ -272,6 +275,7 @@ Output ONLY a JSON list of the cleaned beats, each with:
 - beat_type
 - requires (list of canonical tags)
 - introduces (list of canonical tags)
+- characters (list of canonical character names present/active in this beat)
 - key_dialogues (list)
 - classification ("mandatory" or "scene")
 
@@ -339,9 +343,8 @@ def merge_clusters(cleaned_clusters: List[List[Dict]]) -> List[Dict]:
 
 def _canonicalize_tags_globally(beats: List[Dict]) -> List[Dict]:
     """
-    Post-process all tags across the entire beat list using fuzzy matching.
+    Post-process all tags and characters across the entire beat list using fuzzy matching.
     This catches variations that the LLM might have missed.
-    
     Uses get_close_matches with a cutoff of 0.85 (85% similarity).
     """
     # 1. Collect all unique tags from requires and introduces
@@ -349,13 +352,17 @@ def _canonicalize_tags_globally(beats: List[Dict]) -> List[Dict]:
     for beat in beats:
         all_tags.update(beat.get("requires", []))
         all_tags.update(beat.get("introduces", []))
-    
     all_tags = list(all_tags)
-    
+
+    # 1b. Collect all unique character names
+    all_characters: Set[str] = set()
+    for beat in beats:
+        all_characters.update(beat.get("characters", []))
+    all_characters = list(all_characters)
+
     # 2. Build a canonical mapping using fuzzy matching
     tag_map: Dict[str, str] = {}
     processed = set()
-    
     for tag in sorted(all_tags):  # Sort for deterministic order
         if tag in processed:
             continue
@@ -381,12 +388,39 @@ def _canonicalize_tags_globally(beats: List[Dict]) -> List[Dict]:
                 canonical = matches[0]
         else:
             canonical = tag
-        
         # Map all close matches to the canonical tag
         for m in matches:
             tag_map[m] = canonical
             processed.add(m)
-    
+
+    # 2b. Build a canonical mapping for characters using fuzzy matching
+    character_map: Dict[str, str] = {}
+    processed_characters = set()
+    for name in sorted(all_characters):  # Sort for deterministic order
+        if name in processed_characters:
+            continue
+        matches = get_close_matches(name, all_characters, n=10, cutoff=0.85)
+        if len(matches) > 1:
+            # Prefer the longest/most complete name as canonical (opposite of tags)
+            # "Percy Jackson" is better than "Percy"
+            if len(matches) > 2:
+                name_counts = {}
+                for m in matches:
+                    count = 0
+                    for beat in beats:
+                        count += beat.get("characters", []).count(m)
+                    name_counts[m] = count
+                # Tie-break popularity against length: prefer longer name unless
+                # a shorter variant is overwhelmingly more common
+                canonical = max(matches, key=lambda m: (name_counts[m], len(m)))
+            else:
+                canonical = max(matches, key=len)
+        else:
+            canonical = name
+        for m in matches:
+            character_map[m] = canonical
+            processed_characters.add(m)
+
     # 3. Apply the mapping to all beats
     for beat in beats:
         # Fix requires
@@ -395,13 +429,16 @@ def _canonicalize_tags_globally(beats: List[Dict]) -> List[Dict]:
         # Fix introduces
         if beat.get("introduces"):
             beat["introduces"] = [tag_map.get(t, t) for t in beat["introduces"]]
-        
+        # Fix characters
+        if beat.get("characters"):
+            beat["characters"] = [character_map.get(c, c) for c in beat["characters"]]
         # Remove duplicates within each list
         if beat.get("requires"):
             beat["requires"] = list(dict.fromkeys(beat["requires"]))  # Preserves order
         if beat.get("introduces"):
             beat["introduces"] = list(dict.fromkeys(beat["introduces"]))
-    
+        if beat.get("characters"):
+            beat["characters"] = list(dict.fromkeys(beat["characters"]))
     return beats
 
 
@@ -468,6 +505,7 @@ def replace_candidates_with_final_beats(
                 beat_order=beat_data.get("order", 0),
                 beat_type=beat_data.get("beat_type"),
                 classification=beat_data.get("classification", "scene"),
+                characters = beat_data.get("characters"),
                 description=description,
                 starting_page=_coerce_int(beat_data.get("start_page")),
                 ending_page=_coerce_int(beat_data.get("end_page")),
