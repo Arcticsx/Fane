@@ -195,7 +195,7 @@ class StoryBeat(Base):
     last_attempt = Column(Text, nullable=True) 
     beat_order = Column(Integer)  # renamed from 'order' — reserved word, avoid even quoted
     classification = Column(String)
-    characters = Column(String)
+    characters = Column(Text, nullable=True)
     introduces = Column(Text, nullable=True)  # optional reference to a new character or lore entry introduced by this beat
     requires = Column(Text, nullable=True)  # optional reference to a character or lore entry required for this beat
     key_dialogues = Column(Text, nullable=True)
