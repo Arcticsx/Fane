@@ -41,7 +41,40 @@ Example output:
 TEXT:
 {text}
 '''
-def extract_entities_from_window(session_id, source_document_id, start_page, end_page):
+def _normalize_entity(entity):
+    if not isinstance(entity, dict):
+        print(f"Invalid entity format: {entity}")
+        return None
+
+    name = entity.get("name")
+    entity_type = entity.get("type")
+    pages = entity.get("pages")
+
+    if not name or not isinstance(name, str):
+        print(f"Invalid or missing 'name' in entity: {entity}")
+        return None
+    if entity_type not in ["character", "location", "faction", "item", "concept"]:
+        print(f"Invalid 'type' in entity: {entity}")
+        return None
+    if not isinstance(pages, list) or not all(isinstance(p, int) for p in pages):
+        print(f"Invalid 'pages' in entity: {entity}")
+        return None
+
+    # Normalize the name (e.g., strip whitespace)
+    normalized_name = name.strip()
+
+    # Remove duplicates and sort pages
+    unique_pages = sorted(set(pages))
+
+    return {
+        "name": normalized_name,
+        "type": entity_type,
+        "pages": unique_pages,
+    }
+
+
+
+def extract_entities_from_window(session_id, start_page, end_page):
        
     chunks = query_chroma_by_page_range(
         session_id=session_id,
@@ -74,8 +107,10 @@ def extract_entities_from_window(session_id, source_document_id, start_page, end
     normalized = [_normalize_entity(e) for e in entities]
     normalized = [e for e in normalized if e is not None]
     return normalized
+  
 
-def extract_entities_from_text(session_id, source_document_id):
+
+def process_entities(session_id, source_document_id):
     with get_db() as db:
       source_doc = db.query(SourceDocument).filter(SourceDocument.id == source_document_id).first()
       
@@ -88,7 +123,7 @@ def extract_entities_from_text(session_id, source_document_id):
 
       for start_page, end_page in windows:
           try:
-              entities = extract_entities_from_window(session_id, source_document_id, start_page, end_page)
+              entities = extract_entities_from_window(session_id, start_page, end_page)
               candidate_entities.extend(entities)
               consecutive_failures = 0
           except Exception as e:
@@ -103,7 +138,7 @@ def extract_entities_from_text(session_id, source_document_id):
               if "connection refused" in str(e).lower() or "server disconnected" in str(e).lower():
                   print(f"[process_story_beats] Ollama appears unresponsive, backing off 15s", file=sys.stderr)
                   time.sleep(15)
-                  entities = extract_entities_from_window(session_id, source_document_id, start_page, end_page)
+                  entities = extract_entities_from_window(session_id, start_page, end_page)
               if consecutive_failures >= 5:
                   raise RuntimeError(
                       f"Too many consecutive extraction failures ({consecutive_failures}); "
@@ -111,11 +146,12 @@ def extract_entities_from_text(session_id, source_document_id):
                   )
           finally:
               time.sleep(3) 
-      
+        
+         
       
       
 
-      pass
+  
 
     
-    pass
+    
