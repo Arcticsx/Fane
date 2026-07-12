@@ -1,8 +1,11 @@
 from bisect import bisect_left, bisect_right
 from dataclasses import dataclass
 import sys
-from ..database import get_db
-from ..models.rpg_sessions import GraphEdge
+from narwhals import List
+from pyparsing import Dict
+import sqlalchemy
+
+from ..models.rpg_sessions import GraphEdge, StoryBeat
 
 
 @dataclass
@@ -65,21 +68,33 @@ def build_beat_graph(beats: list[dict]) -> list[dict]:
             if target is not None:
                 edges.append(Edge(pos, target, "structural"))
 
-    return [{"source": e.source, "target": e.target, "kind": e.kind} for e in edges]
+    output =  [{"source": e.source, "target": e.target, "kind": e.kind} for e in edges]
+    print(f"[graph.build_beat_graph] built {len(output)} edges for {n} beats", file=sys.stderr)
+    print(f"[graph.build_beat_graph] edges: {output}", file=sys.stderr)
+    return output
 
 
 def persist_beat_graph(
     db: Session,
     session_id: str,
-    beats: List[Dict],
     edges: List[Dict],
 ) -> int:
     """
     Persist graph edges produced by build_beat_graph() into the graph_edges table.
     Uses the caller's session — does not open its own.
+
+    Queries StoryBeat rows for session_id, ordered by beat_order, to reconstruct
+    the same positional indexing that build_beat_graph used when it produced `edges`
+    (edge["source"]/edge["target"] are positions into that ordered list).
     """
+    beats = (
+        db.query(StoryBeat)
+        .filter(StoryBeat.session_id == session_id)
+        .order_by(StoryBeat.beat_order)
+        .all()
+    )
     n = len(beats)
-    beat_ids = [b["id"] for b in beats]
+    beat_ids = [b.id for b in beats]
 
     try:
         deleted = db.query(GraphEdge).filter(

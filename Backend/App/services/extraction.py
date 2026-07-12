@@ -114,6 +114,7 @@ def _normalize_beat(beat: dict) -> dict | None:
         "description": beat["description"],
         "start_page": beat.get("start_page"),
         "end_page": beat.get("end_page"),
+        "characters": beat.get("characters", []),
         "requires": beat.get("requires", []),
         "introduces": beat.get("introduces", []),
         "key_dialogues": beat.get("key_dialogues", []),

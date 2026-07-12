@@ -31,13 +31,19 @@ def run_reduce_phase(db, session_id, candidate_beats, source_doc_id):
 
         merged_beats = merge_clusters(reduced_clusters)
         _dbg(f"merge_clusters -> {len(merged_beats)} final merged beats")
+        
+        for i, beat in enumerate(merged_beats):
+            beat["order"] = i
 
-        final_beats = merged_beats  # NOTE: was undefined before — see message above
+        merged_beats.sort(key=lambda b: b["order"])
 
-        replace_candidates_with_final_beats(db, session_id, source_doc_id, final_beats)
-        _dbg(f"persisted {len(final_beats)} final beats for session={session_id} doc={source_doc_id}")
+        
+        replace_candidates_with_final_beats(db, session_id, source_doc_id, merged_beats)
+        _dbg(f"persisted {len(merged_beats)} final beats for session={session_id} doc={source_doc_id}")
+        
+        
 
-        return final_beats
+        return merged_beats
 
     except Exception as e:
         print(f"[run_reduce_phase] Error reducing beats for session {session_id}: {e}", file=sys.stderr)

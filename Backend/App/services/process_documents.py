@@ -5,9 +5,6 @@ from ..database import get_db
 from ..models import SourceDocument
 from .documents import chunk_document, embed_chunks, get_document_metadata
 from .vectorstore import save_chunks_to_chromadb
-from .extraction import extract_beats_from_window, replace_candidates_with_final_beats
-from .beats_reduce import run_reduce_phase
-from .beats_graph import run_graph_phase
 from .process_story_beats import process_story_beats
 
 
