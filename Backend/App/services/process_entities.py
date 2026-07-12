@@ -1,3 +1,4 @@
+from os import name
 import sys
 import time
 
@@ -5,10 +6,9 @@ from Backend.App.models.rpg_sessions import SourceDocument
 from Backend.App.response import get_response
 from Backend.App.services.extraction import _assemble_pages_text, _normalize_beat, _parse_json_response, extract_beats_from_window
 from Backend.App.services.vectorstore import query_chroma_by_page_range
-
+from .entities_reduce import merge_entity_clusters
 from .documents import generate_page_windows
 from ..database import get_db
-
 SYSTEM_PROMPT = '''
 You are an entity extraction system for a narrative processing pipeline. Given a chunk of novel text, covering pages {start_page}-{end_page}, extract every distinct named entity that is explicitly present in the text.
 
@@ -41,28 +41,95 @@ Example output:
 TEXT:
 {text}
 '''
+
+def process_entities(session_id, source_document_id):
+    with get_db() as db:
+      source_doc = db.query(SourceDocument).filter(SourceDocument.id == source_document_id).first()
+      
+      if not source_doc or not source_doc.total_pages:
+                raise ValueError(
+                        f"[process_entities] Source document missing or has no total_pages: "
+                        f"session_id={session_id}, source_document_id={source_document_id}, source_doc={source_doc}"
+                )
+      
+      windows = generate_page_windows(total_pages=source_doc.total_pages, window_size=5, overlap=1)
+      candidate_entities = []
+      consecutive_failures = 0
+
+      for start_page, end_page in windows:
+        try:
+            entities = extract_entities_from_window(session_id, start_page, end_page)
+            candidate_entities.append(entities)
+            consecutive_failures = 0
+        except Exception as e:
+            consecutive_failures += 1
+            print(
+                f"[process_entities] Error extracting pages {start_page}-{end_page} "
+                f"for {source_document_id}: {e}",
+                file=sys.stderr,
+            )
+            if "connection refused" in str(e).lower() or "server disconnected" in str(e).lower():
+                print(f"[process_entities] Ollama appears unresponsive, backing off 15s", file=sys.stderr)
+                time.sleep(15)
+                try:
+                    entities = extract_entities_from_window(session_id, start_page, end_page)
+                    candidate_entities.append(entities)
+                    consecutive_failures = 0
+                except Exception as retry_e:
+                    print(f"[process_entities] Retry also failed: {retry_e}", file=sys.stderr)
+
+            if consecutive_failures >= 5:
+                raise RuntimeError(
+                    f"Too many consecutive extraction failures ({consecutive_failures}); "
+                    f"aborting rather than continuing to degrade. "
+                    f"session_id={session_id}, source_document_id={source_document_id}, "
+                    f"window={start_page}-{end_page}"
+                )
+        finally:
+            time.sleep(3)
+        
+    try:
+        merged_entities = merge_entity_clusters(candidate_entities)
+    except Exception as merge_error:
+        print(
+            f"[process_entities] Failed to merge {len(candidate_entities)} candidate entities for "
+            f"session_id={session_id}, source_document_id={source_document_id}: {type(merge_error).__name__}: {merge_error}",
+            file=sys.stderr,
+        )
+        raise
+
+    total_candidates = sum(len(c) for c in candidate_entities)
+    print(
+        f"[process_entities] Merged {total_candidates} candidate entities into {len(merged_entities)} unique entities",
+        file=sys.stderr,
+    )
+    print(f"[process_entities] Final merged entities: {merged_entities}", file=sys.stderr)
+    return
+
 def _normalize_entity(entity):
     if not isinstance(entity, dict):
-        print(f"Invalid entity format: {entity}")
+        print(f"[process_entities._normalize_entity] Invalid entity format: {entity!r}", file=sys.stderr)
         return None
 
     name = entity.get("name")
     entity_type = entity.get("type")
+    if isinstance(entity_type, str):
+        entity_type = entity_type.strip().lower()
     pages = entity.get("pages")
 
     if not name or not isinstance(name, str):
-        print(f"Invalid or missing 'name' in entity: {entity}")
+        print(f"[process_entities._normalize_entity] Invalid or missing 'name' in entity: {entity!r}", file=sys.stderr)
         return None
     if entity_type not in ["character", "location", "faction", "item", "concept"]:
-        print(f"Invalid 'type' in entity: {entity}")
+        print(f"[process_entities._normalize_entity] Invalid 'type' in entity: {entity!r}", file=sys.stderr)
         return None
     if not isinstance(pages, list) or not all(isinstance(p, int) for p in pages):
-        print(f"Invalid 'pages' in entity: {entity}")
+        print(f"[process_entities._normalize_entity] Invalid 'pages' in entity: {entity!r}", file=sys.stderr)
         return None
+    
 
     # Normalize the name (e.g., strip whitespace)
-    normalized_name = name.strip()
-
+    normalized_name = " ".join(name.split())
     # Remove duplicates and sort pages
     unique_pages = sorted(set(pages))
 
@@ -84,6 +151,11 @@ def extract_entities_from_window(session_id, start_page, end_page):
     )
 
     if not chunks:
+        print(
+            f"[process_entities.extract_entities_from_window] No chunks found for "
+            f"session_id={session_id}, window={start_page}-{end_page}",
+            file=sys.stderr,
+        )
         return []
 
     pages_text = _assemble_pages_text(chunks)
@@ -91,17 +163,49 @@ def extract_entities_from_window(session_id, start_page, end_page):
     prompt = SYSTEM_PROMPT.format(
         start_page=start_page,
         end_page=end_page,
-        pages_text=pages_text,
+        text=pages_text,
     )
     approx_tokens = len(prompt) // 4  # rough chars-to-tokens estimate
-    print(f"[DEBUG] window {start_page}-{end_page}: ~{approx_tokens} tokens, {len(chunks)} chunks")
+    print(
+        f"[process_entities.extract_entities_from_window] window={start_page}-{end_page}, "
+        f"session_id={session_id}, ~{approx_tokens} tokens, chunks={len(chunks)}",
+        file=sys.stderr,
+    )
     
-    response = get_response(prompt, mode="chronicle_entities")
-    print(response)
-    entities = _parse_json_response(response)
+    try:
+        response = get_response(prompt, mode="chronicle_entities")
+    except Exception as response_error:
+        print(
+            f"[process_entities.extract_entities_from_window] LLM call failed for "
+            f"session_id={session_id}, window={start_page}-{end_page}: "
+            f"{type(response_error).__name__}: {response_error}",
+            file=sys.stderr,
+        )
+        raise
+
+    print(
+        f"[process_entities.extract_entities_from_window] Raw entity response for "
+        f"session_id={session_id}, window={start_page}-{end_page}: {response}",
+        file=sys.stderr,
+    )
+
+    try:
+        entities = _parse_json_response(response)
+    except Exception as parse_error:
+        print(
+            f"[process_entities.extract_entities_from_window] JSON parse failed for "
+            f"session_id={session_id}, window={start_page}-{end_page}: "
+            f"{type(parse_error).__name__}: {parse_error}",
+            file=sys.stderr,
+        )
+        raise
     
     if entities is None or not isinstance(entities, list):
-        print(f"Failed to parse entities for pages {start_page}-{end_page}: invalid JSON response")
+        print(
+            f"[process_entities.extract_entities_from_window] Failed to parse entities for "
+            f"session_id={session_id}, window={start_page}-{end_page}: invalid JSON response {entities!r}",
+            file=sys.stderr,
+        )
         return []
 
     normalized = [_normalize_entity(e) for e in entities]
@@ -110,42 +214,7 @@ def extract_entities_from_window(session_id, start_page, end_page):
   
 
 
-def process_entities(session_id, source_document_id):
-    with get_db() as db:
-      source_doc = db.query(SourceDocument).filter(SourceDocument.id == source_document_id).first()
-      
-      if not source_doc or not source_doc.total_pages:
-        raise ValueError("Source document missing or has no total_pages")
-      
-      windows = generate_page_windows(total_pages=source_doc.total_pages, window_size=5, overlap=1)
-      candidate_entities = []
-      consecutive_failures = 0
 
-      for start_page, end_page in windows:
-          try:
-              entities = extract_entities_from_window(session_id, start_page, end_page)
-              candidate_entities.extend(entities)
-              consecutive_failures = 0
-          except Exception as e:
-              consecutive_failures += 1
-              print(
-                  f"[process_story_beats] Error extracting pages {start_page}-{end_page} "
-                  f"for {source_document_id}: {e}",
-                  file=sys.stderr,
-              )
-              # If the local model server itself is down, back off harder before
-              # hammering it with the next window's request.
-              if "connection refused" in str(e).lower() or "server disconnected" in str(e).lower():
-                  print(f"[process_story_beats] Ollama appears unresponsive, backing off 15s", file=sys.stderr)
-                  time.sleep(15)
-                  entities = extract_entities_from_window(session_id, start_page, end_page)
-              if consecutive_failures >= 5:
-                  raise RuntimeError(
-                      f"Too many consecutive extraction failures ({consecutive_failures}); "
-                      f"aborting rather than continuing to degrade"
-                  )
-          finally:
-              time.sleep(3) 
         
          
       
