@@ -8,10 +8,9 @@ try:
 except ImportError:
     from response import get_response
 
-from datetime import time
 import json
 import re
-from time import time
+import time
 import sys
 from ..database import get_db
 from ..models.rpg_sessions import StoryBeat
@@ -37,22 +36,29 @@ Return ONLY a JSON list, no prose before or after. Each beat must use exactly th
 {{
     "classification": "mandatory",
     "beat_type": "decision_point",
-    "description": "Two-sentences, immutable summary.",
+    "description": "2-4 sentence immutable summary. Cover: what happens, who does it and why, what changes (physically, emotionally, or relationally) as a result, and any concrete detail (place, object, number, name) that makes the beat useful as game-state context later.",
     "start_page": 12,
     "end_page": 14,
-    "requires": ["asset1"],
-    "introduces": ["asset2"],
+    "requires": ["spoke with the village elder"],
+    "introduces": ["received the mystic amulet"],
     "characters": ["Character Name", "..."],
     "key_dialogues": ["Verbatim quote", "..."]
 }}
 ]
 ```
 Rules:
-- description: immutable, never changes during gameplay.
+- description: immutable, never changes during gameplay. Write it so someone who has NOT read the book understands the beat on its own — no pronouns standing in for names, no vague references like "the artifact" without saying which one. Favor specificity over brevity: name the location, state the stakes, name what was said or decided and by whom, and note the consequence or emotional shift if there is one.
 - start_page/end_page: must stay within {start_page}-{end_page}, no overlapping ranges. Use "[page N]" markers in the text.
-- requires: tags needed from earlier beats (anywhere in story so far). [] if none.
-- introduces: new tags this beat creates. [] if none.
-- characters: Names of every character present or active in this beat, using the most complete form the text gives you (e.g. "Percy Jackson" not "he" or "the boy"). [] if none.
+- requires: short natural-language phrases describing prior events, knowledge, items, or relationships this beat depends on (from anywhere earlier in the story). [] if none. Rules for phrasing:
+    - 3-8 words per phrase, simple past tense, no pronouns — name characters/objects explicitly (e.g. "learned about the hidden passage", not "learned about it").
+    - Phrase each requirement the same way you would phrase the matching fact if it had been introduced — these get matched by semantic similarity at runtime, so consistent, literal phrasing matters more than variety.
+    - Describe the underlying fact/event, not the beat name (e.g. "received the mystic amulet", not "amulet beat").
+- introduces: short natural-language phrases describing new facts, events, items, or relationships established by this beat. [] if none. Rules for phrasing:
+    - Same style as requires: 3-8 words, simple past tense, no pronouns, self-contained (readable with zero surrounding context).
+    - Write these as the concrete, reusable fact the rest of the story would need to reference (e.g. "met the old hermit in the forest", "learned the innkeeper's secret", "received the mystic amulet from the hermit").
+    - Do not include vague or purely emotional entries (e.g. "felt sad") unless that emotional state is itself a plot-relevant condition later beats depend on.
+    - One phrase per discrete fact — don't bundle multiple facts into one string.
+- characters: List EVERY character present or active in the beat, including the protagonist/POV character even if they are only referred to as "I," "he," "she," or by pronoun in the text. Do not omit the protagonist just because they are the narrator — if they act, speak, react, or are simply in the scene, include their name. Use the most complete form the text gives you (e.g. "Percy Jackson" not "he" or "the boy"). Include characters who are spoken about and directly participate via dialogue or action, but exclude characters who are merely mentioned in passing with no active role. [] if none.
 - key_dialogues: up to 5 verbatim quotes. [] if none.
 
 ## Text to extract from:

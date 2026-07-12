@@ -33,6 +33,18 @@ BEAT_SCHEMA = {
     },
 }
 
+ENTITIES_SCHEMA = {
+    "type": "array",
+    "items": {
+        "type": "object",
+        "properties": {
+            "name": {"type": "string"},
+            "type": {"type": "string", "enum": ["character", "location", "organization", "artifact", "concept"]},
+            "pages": {"type": "array", "items": {"type": "integer"}},
+        },
+        "required": ["name", "type", "pages"],
+    },
+}
 
 
 def get_client(mode):
@@ -63,7 +75,7 @@ def get_client(mode):
                 )
             except Exception as e:
                 print(f"[Warning] ollama client init failed: {e}")
-    elif mode == "chronicle":
+    elif mode == "chronicle_beats":
         if PROVIDER == "deepseek":
             try:
                 return ChatOpenAI(
@@ -93,7 +105,37 @@ def get_client(mode):
                 )
             except Exception as e:
                 print(f"[Warning] ollama client init failed: {e}")
-        
+    
+    elif mode == "chronicle_entities":
+        if PROVIDER == "deepseek":
+            try:
+                return ChatOpenAI(
+                    model=AISUITE_MODEL,
+                    api_key=API_KEY,
+                    base_url="https://api.deepseek.com",
+                    temperature=0,
+                    format=ENTITIES_SCHEMA,
+                )
+            except Exception as e:
+                print(f"[Warning] deepseek client init failed: {e}")
+                # fall through to stub
+
+        elif PROVIDER == "ollama":
+            try:
+                from langchain_ollama import ChatOllama
+                model_name = AISUITE_MODEL
+                if model_name and ":" in model_name:
+                    model_name = model_name.split(":", 1)[1]
+                return ChatOllama(
+                    model=model_name,
+                    base_url="http://localhost:11434",
+                    temperature=0,
+                    num_ctx=12000,
+                    num_predict=4092,   # <-- don't drop this, it was fixing the "one beat per chunk" truncation
+                    format=ENTITIES_SCHEMA,
+                )
+            except Exception as e:
+                print(f"[Warning] ollama client init failed: {e}")
 
     # Fallback: when no provider is configured (local development/tests),
     # return a simple deterministic stub client so `/chat` remains usable.

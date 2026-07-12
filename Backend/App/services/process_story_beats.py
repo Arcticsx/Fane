@@ -56,7 +56,7 @@ def process_story_beats(
                                 f"aborting rather than continuing to degrade"
                             )
                     finally:
-                        time.sleep(1.5)  # cooldown between every window, success or failure
+                        time.sleep(3)  # cooldown between every window, success or failure
 
                 if not candidate_beats:
                     raise ValueError("No beats extracted")
