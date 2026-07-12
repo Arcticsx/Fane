@@ -8,8 +8,10 @@ try:
 except ImportError:
     from response import get_response
 
+from datetime import time
 import json
 import re
+from time import time
 import sys
 from ..database import get_db
 from ..models.rpg_sessions import StoryBeat
@@ -286,9 +288,16 @@ Do NOT include 'order' – that will be assigned later.
     _dbg(f"reduce_cluster: input={len(cluster)} candidates, prompt_len={prompt_chars} chars "
          f"(~{prompt_chars // 4} tokens)")
 
-    response = get_response(prompt, mode="chronicle")
-    _dbg(f"reduce_cluster: raw response_len={len(response)} chars, "
-         f"head={response[:120]!r}")
+    try:
+        response = get_response(prompt, mode="chronicle")
+        _dbg(f"reduce_cluster: raw response_len={len(response)} chars, "
+            f"head={response[:120]!r}")
+    except Exception as e:
+        print(f"[reduce_cluster] Error calling LLM for cluster reduction: {e}", file=sys.stderr)
+        time.sleep(15)  # back off a bit before retrying
+        response = get_response(prompt, mode="chronicle")
+    finally:
+        time.sleep(3)  # cooldown between LLM calls
 
     # Clean markdown fences
     clean = re.sub(r'```json\s*', '', response)
