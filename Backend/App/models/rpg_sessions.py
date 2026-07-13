@@ -105,7 +105,7 @@ class ChronicleChapter(Base):
         String, ForeignKey("rpg_sessions.id", ondelete="CASCADE"), nullable=False
     )
     number = Column(Integer, nullable=False)  # e.g., 1 for Chapter 1
-    title = Column(String, nullable=False)
+    title = Column(Text, nullable=False)
     start_page = Column(Integer, nullable=False)  # e.g., 1
     end_page = Column(Integer, nullable=False)  # e.g., 10
     page_range = Column(String, nullable=False)  # e.g., "1-10"

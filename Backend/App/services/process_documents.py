@@ -1,10 +1,9 @@
 import os
 import sys
 from datetime import datetime, timezone
-
-from pydantic import json
+import json
 from ..database import get_db
-from ..models import SourceDocument, ChronicleChapter
+from ..models.rpg_sessions import SourceDocument, ChronicleChapter
 from .documents import chunk_document, embed_chunks, get_chapters, get_document_metadata
 from .vectorstore import save_chunks_to_chromadb
 from .process_story_beats import process_story_beats
@@ -40,13 +39,16 @@ def process_document(
 
             try:
                 chapters = get_chapters(temp_path, doc_meta["total_pages"])
+                print(f"[process_document] Extracted {len(chapters)} chapters for {temp_path}")
+                print(f"[process_document] Chapters: {json.dumps(chapters, indent=2)}")
             except Exception as e:
                 print(f"[process_document] Error extracting chapters for {temp_path}: {e}", file=sys.stderr)
                 raise
             
             if chapters:
+                print(f"[process_document] Inserting {len(chapters)} chapters into database for session {session_id}")
                 for chapter in chapters:
-                    chronicle_chapter = SourceDocument(
+                    chronicle_chapter = ChronicleChapter(
                         session_id=session_id,
                         number=chapter.get("number"),
                         title=chapter.get("title"),
@@ -56,8 +58,14 @@ def process_document(
                         characters=None,
                     )
                     db.add(chronicle_chapter)
-                db.commit()
-                print(f"Inserted {len(chapters)} chapters")
+                    print(f"Inserted chapter {chapter.get('number')}: '{chapter.get('title')}' pages {chapter.get('start_page')}-{chapter.get('end_page')}")
+                try:
+                    db.commit()
+                    print(f"Inserted {len(chapters)} chapters")
+                except Exception as e:
+                    print(f"[process_document] Error committing chapters to database for session {session_id}: {e}", file=sys.stderr)
+                    db.rollback()
+                    raise
             else:
                 print(f"No chapters extracted")
                         
@@ -102,42 +110,42 @@ def process_document(
                     db.commit()
                 raise
 
-            try:
-                process_story_beats(session_id=session_id, source_document_id=source_doc_id)
-            except Exception as e:
-                print(f"[process_document] Error processing story beats for {source_doc_id}: {e}", file=sys.stderr)
-                with get_db() as db:
-                    sd = db.query(SourceDocument).filter(SourceDocument.id == source_doc_id).first()
-                    if sd:
-                        sd.error_message = str(e)[:1000]
-                        sd.status = "failed"
-                        db.commit()
-                raise
+            # try:
+            #     process_story_beats(session_id=session_id, source_document_id=source_doc_id)
+            # except Exception as e:
+            #     print(f"[process_document] Error processing story beats for {source_doc_id}: {e}", file=sys.stderr)
+            #     with get_db() as db:
+            #         sd = db.query(SourceDocument).filter(SourceDocument.id == source_doc_id).first()
+            #         if sd:
+            #             sd.error_message = str(e)[:1000]
+            #             sd.status = "failed"
+            #             db.commit()
+            #     raise
             
-            try:
-                characters,lore = process_entities(session_id=session_id, source_document_id=source_doc_id)
-            except Exception as e:
-                print(f"[process_document] Error processing entities for {source_doc_id}: {e}", file=sys.stderr)
-                with get_db() as db:
-                    sd = db.query(SourceDocument).filter(SourceDocument.id == source_doc_id).first()
-                    if sd:
-                        sd.error_message = str(e)[:1000]
-                        sd.status = "failed"
-                        db.commit()
-                raise
+            # try:
+            #     characters,lore = process_entities(session_id=session_id, source_document_id=source_doc_id)
+            # except Exception as e:
+            #     print(f"[process_document] Error processing entities for {source_doc_id}: {e}", file=sys.stderr)
+            #     with get_db() as db:
+            #         sd = db.query(SourceDocument).filter(SourceDocument.id == source_doc_id).first()
+            #         if sd:
+            #             sd.error_message = str(e)[:1000]
+            #             sd.status = "failed"
+            #             db.commit()
+            #     raise
             
            
-            try:
-                process_characters(session_id=session_id, source_document_id=source_doc_id, characters=characters)
-            except Exception as e:
-                print(f"[process_document] Error processing characters for {source_doc_id}: {e}", file=sys.stderr)
-                with get_db() as db:
-                    sd = db.query(SourceDocument).filter(SourceDocument.id == source_doc_id).first()
-                    if sd:
-                        sd.error_message = str(e)[:1000]
-                        sd.status = "failed"
-                        db.commit()
-                raise 
+            # try:
+            #     process_characters(session_id=session_id, source_document_id=source_doc_id, characters=characters)
+            # except Exception as e:
+            #     print(f"[process_document] Error processing characters for {source_doc_id}: {e}", file=sys.stderr)
+            #     with get_db() as db:
+            #         sd = db.query(SourceDocument).filter(SourceDocument.id == source_doc_id).first()
+            #         if sd:
+            #             sd.error_message = str(e)[:1000]
+            #             sd.status = "failed"
+            #             db.commit()
+            #     raise 
             
 
     except Exception as e:

@@ -27,8 +27,8 @@ def test_characters(session_id, source_doc_id):
     
 def main():
     
-    session_id = "03284968-f3c4-41dc-abb6-60407d0dc9ee"
-    source_doc_id = "41df0c62-a668-4ff1-bf5b-3db0c3be0b15"
+    session_id = "628f28c3-15dd-4011-b317-6f9e0928c1ab"
+    source_doc_id = "bf5a5374-4019-471a-9105-98086af6f692"
     test_characters(session_id, source_doc_id)
     
 if __name__ == "__main__":

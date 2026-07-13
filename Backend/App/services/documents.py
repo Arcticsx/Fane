@@ -80,6 +80,7 @@ def extract_chapters_from_toc(file_path, total_pages, min_level=1, max_level=1):
     toc = doc.get_toc()  # returns [[level, title, page_number], ...], 1-indexed pages
     doc.close()
 
+    
     if not toc:
         return []
 
@@ -102,6 +103,8 @@ def extract_chapters_from_toc(file_path, total_pages, min_level=1, max_level=1):
         if end_page < start_page:
             end_page = start_page
 
+        print(f"[extract_chapters_from_toc] Chapter {i + 1}: '{title}' pages {start_page}-{end_page}")
+        
         chapters.append({
             "number": i + 1,
             "title": title,
@@ -114,7 +117,7 @@ def extract_chapters_from_toc(file_path, total_pages, min_level=1, max_level=1):
 
 
 def get_chapters(file_path, total_pages):
-    
+    print(f"[get_chapters] Attempting to extract chapters from ToC for {file_path}")
     chapters = extract_chapters_from_toc(file_path, total_pages)
     if chapters:
         return chapters
