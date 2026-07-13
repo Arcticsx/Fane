@@ -99,8 +99,7 @@ def get_client(mode):
                     model=model_name,
                     base_url="http://localhost:11434",
                     temperature=0,
-                    num_ctx=12000,
-                    num_predict=4092,   # <-- don't drop this, it was fixing the "one beat per chunk" truncation
+                    num_ctx=8192,
                     format=BEAT_SCHEMA,
                 )
             except Exception as e:
@@ -130,8 +129,7 @@ def get_client(mode):
                     model=model_name,
                     base_url="http://localhost:11434",
                     temperature=0,
-                    num_ctx=12000,
-                    num_predict=4092,   # <-- don't drop this, it was fixing the "one beat per chunk" truncation
+                    num_ctx=8192,
                     format=ENTITIES_SCHEMA,
                 )
             except Exception as e:

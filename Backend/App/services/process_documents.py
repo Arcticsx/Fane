@@ -1,6 +1,8 @@
 import os
 import sys
 from datetime import datetime, timezone
+
+from pydantic import json
 from ..database import get_db
 from ..models import SourceDocument
 from .documents import chunk_document, embed_chunks, get_document_metadata
@@ -77,17 +79,17 @@ def process_document(
                     db.commit()
                 raise
 
-            # try:
-            #     process_story_beats(session_id=session_id, source_document_id=source_doc_id)
-            # except Exception as e:
-            #     print(f"[process_document] Error processing story beats for {source_doc_id}: {e}", file=sys.stderr)
-            #     with get_db() as db:
-            #         sd = db.query(SourceDocument).filter(SourceDocument.id == source_doc_id).first()
-            #         if sd:
-            #             sd.error_message = str(e)[:1000]
-            #             sd.status = "failed"
-            #             db.commit()
-            #     raise
+            try:
+                process_story_beats(session_id=session_id, source_document_id=source_doc_id)
+            except Exception as e:
+                print(f"[process_document] Error processing story beats for {source_doc_id}: {e}", file=sys.stderr)
+                with get_db() as db:
+                    sd = db.query(SourceDocument).filter(SourceDocument.id == source_doc_id).first()
+                    if sd:
+                        sd.error_message = str(e)[:1000]
+                        sd.status = "failed"
+                        db.commit()
+                raise
             
             try:
                 characters,lore = process_entities(session_id=session_id, source_document_id=source_doc_id)
@@ -101,18 +103,18 @@ def process_document(
                         db.commit()
                 raise
             
-            # try:
-            #     process_characters(session_id=session_id, source_document_id=source_doc_id, characters=characters)
-            # except Exception as e:
-            #     print(f"[process_document] Error processing characters for {source_doc_id}: {e}", file=sys.stderr)
-            #     with get_db() as db:
-            #         sd = db.query(SourceDocument).filter(SourceDocument.id == source_doc_id).first()
-            #         if sd:
-            #             sd.error_message = str(e)[:1000]
-            #             sd.status = "failed"
-            #             db.commit()
-            #     raise
-                
+           
+            try:
+                process_characters(session_id=session_id, source_document_id=source_doc_id, characters=characters)
+            except Exception as e:
+                print(f"[process_document] Error processing characters for {source_doc_id}: {e}", file=sys.stderr)
+                with get_db() as db:
+                    sd = db.query(SourceDocument).filter(SourceDocument.id == source_doc_id).first()
+                    if sd:
+                        sd.error_message = str(e)[:1000]
+                        sd.status = "failed"
+                        db.commit()
+                raise 
             
 
     except Exception as e:

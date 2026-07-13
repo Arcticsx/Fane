@@ -97,17 +97,35 @@ def process_entities(session_id, source_document_id):
             file=sys.stderr,
         )
         raise
+    
+    spanned_entities = []
+    
+    for entity in merged_entities:
+        spans, total_pages = span_construction(entity["pages"], gap_tolerance=2)
+        spanned_entities.append({
+            "name": entity["name"],
+            "type": entity["type"],
+            "spans": spans,
+            "total_pages": total_pages
+        })
+        
 
     total_candidates = sum(len(c) for c in candidate_entities)
     print(
-        f"[process_entities] Merged {total_candidates} candidate entities into {len(merged_entities)} unique entities",
+        f"[process_entities] Merged {total_candidates} candidate entities into {len(spanned_entities)} unique entities",
         file=sys.stderr,
     )
-    print(f"[process_entities] Final merged entities: {merged_entities}", file=sys.stderr)
+    print(f"[process_entities] Final merged entities: {spanned_entities}", file=sys.stderr)
     
-    characters, lore = seperate_candidates(merged_entities)
-    print(characters)
+    characters, lore = seperate_candidates(spanned_entities)
+    
+    print(f"[process_entities] Processed characters: {characters}")
+    
     return characters, lore
+
+
+
+
 
 def _normalize_entity(entity):
     if not isinstance(entity, dict):
@@ -239,7 +257,38 @@ def seperate_candidates(candidate_entities):
     
     return characters, lore
 
-        
+
+def span_construction(pages, gap_tolerance=2):
+    
+    if not pages:
+        return []
+
+    sorted_pages = sorted(set(pages))
+
+    spans = []
+    current_run = [sorted_pages[0]]
+    total_pages = len(sorted_pages)
+    for prev_page, page in zip(sorted_pages, sorted_pages[1:]):
+        gap = page - prev_page
+        if gap <= gap_tolerance:
+            current_run.append(page)
+        else:
+            spans.append({
+                "start": current_run[0],
+                "end": current_run[-1],
+                "page_count": len(current_run),
+                "pages": current_run,
+            })
+            current_run = [page]
+
+    spans.append({
+        "start": current_run[0],
+        "end": current_run[-1],
+        "page_count": len(current_run),
+        "pages": current_run,
+    })
+
+    return spans, total_pages      
          
       
       
