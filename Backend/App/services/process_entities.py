@@ -104,7 +104,10 @@ def process_entities(session_id, source_document_id):
         file=sys.stderr,
     )
     print(f"[process_entities] Final merged entities: {merged_entities}", file=sys.stderr)
-    return
+    
+    characters, lore = seperate_candidates(merged_entities)
+    print(characters)
+    return characters, lore
 
 def _normalize_entity(entity):
     if not isinstance(entity, dict):
@@ -213,7 +216,28 @@ def extract_entities_from_window(session_id, start_page, end_page):
     return normalized
   
 
+def seperate_candidates(candidate_entities):
+    """
+    Separate candidate entities into their respective types.
+    Returns a dictionary with keys: 'character', 'location', 'faction', 'item', 'concept'.  
+    """
+    characters = []
+    lore = []
+    for entity in candidate_entities:
+        if not isinstance(entity, dict):
+            print(f"[process_entities.seperate_candidates] Invalid entity format: {entity!r}", file=sys.stderr)
+            continue
 
+        entity_type = entity.get("type")
+        if entity_type == "character":
+            characters.append(entity)
+        elif entity_type in ["location", "faction", "item", "concept"]:
+            lore.append(entity)
+        else:   
+            print(f"[process_entities.seperate_candidates] Unknown entity type: {entity_type!r} in entity: {entity!r}", file=sys.stderr)
+            continue
+    
+    return characters, lore
 
         
          

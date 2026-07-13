@@ -7,6 +7,7 @@ from .documents import chunk_document, embed_chunks, get_document_metadata
 from .vectorstore import save_chunks_to_chromadb
 from .process_story_beats import process_story_beats
 from .process_entities import process_entities
+from .process_characters import process_characters
 
 def process_document(
     source_doc_id: str,
@@ -76,20 +77,20 @@ def process_document(
                     db.commit()
                 raise
 
-            try:
-                process_story_beats(session_id=session_id, source_document_id=source_doc_id)
-            except Exception as e:
-                print(f"[process_document] Error processing story beats for {source_doc_id}: {e}", file=sys.stderr)
-                with get_db() as db:
-                    sd = db.query(SourceDocument).filter(SourceDocument.id == source_doc_id).first()
-                    if sd:
-                        sd.error_message = str(e)[:1000]
-                        sd.status = "failed"
-                        db.commit()
-                raise
+            # try:
+            #     process_story_beats(session_id=session_id, source_document_id=source_doc_id)
+            # except Exception as e:
+            #     print(f"[process_document] Error processing story beats for {source_doc_id}: {e}", file=sys.stderr)
+            #     with get_db() as db:
+            #         sd = db.query(SourceDocument).filter(SourceDocument.id == source_doc_id).first()
+            #         if sd:
+            #             sd.error_message = str(e)[:1000]
+            #             sd.status = "failed"
+            #             db.commit()
+            #     raise
             
             try:
-                process_entities(session_id=session_id, source_document_id=source_doc_id)
+                characters,lore = process_entities(session_id=session_id, source_document_id=source_doc_id)
             except Exception as e:
                 print(f"[process_document] Error processing entities for {source_doc_id}: {e}", file=sys.stderr)
                 with get_db() as db:
@@ -99,6 +100,19 @@ def process_document(
                         sd.status = "failed"
                         db.commit()
                 raise
+            
+            # try:
+            #     process_characters(session_id=session_id, source_document_id=source_doc_id, characters=characters)
+            # except Exception as e:
+            #     print(f"[process_document] Error processing characters for {source_doc_id}: {e}", file=sys.stderr)
+            #     with get_db() as db:
+            #         sd = db.query(SourceDocument).filter(SourceDocument.id == source_doc_id).first()
+            #         if sd:
+            #             sd.error_message = str(e)[:1000]
+            #             sd.status = "failed"
+            #             db.commit()
+            #     raise
+                
             
 
     except Exception as e:
