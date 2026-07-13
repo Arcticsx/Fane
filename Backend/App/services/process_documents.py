@@ -4,8 +4,8 @@ from datetime import datetime, timezone
 
 from pydantic import json
 from ..database import get_db
-from ..models import SourceDocument
-from .documents import chunk_document, embed_chunks, get_document_metadata
+from ..models import SourceDocument, ChronicleChapter
+from .documents import chunk_document, embed_chunks, get_chapters, get_document_metadata
 from .vectorstore import save_chunks_to_chromadb
 from .process_story_beats import process_story_beats
 from .process_entities import process_entities
@@ -38,6 +38,29 @@ def process_document(
             else:
                 print(f"No document metadata")
 
+            try:
+                chapters = get_chapters(temp_path, doc_meta["total_pages"])
+            except Exception as e:
+                print(f"[process_document] Error extracting chapters for {temp_path}: {e}", file=sys.stderr)
+                raise
+            
+            if chapters:
+                for chapter in chapters:
+                    chronicle_chapter = SourceDocument(
+                        session_id=session_id,
+                        number=chapter.get("number"),
+                        title=chapter.get("title"),
+                        start_page=chapter.get("start_page"),
+                        end_page=chapter.get("end_page"),
+                        page_range=chapter.get("page_range"),
+                        characters=None,
+                    )
+                    db.add(chronicle_chapter)
+                db.commit()
+                print(f"Inserted {len(chapters)} chapters")
+            else:
+                print(f"No chapters extracted")
+                        
             try:
                 chunks = chunk_document(temp_path, chunksize=500, overlap=50)
             except Exception as e:

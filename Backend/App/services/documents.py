@@ -64,6 +64,64 @@ def token_length(text):
         print("[documents.token_length] tokenizer.encode failed, falling back to word count", file=sys.stderr)
         return max(1, len(text.split()))
 
+def extract_chapters_from_toc(file_path, total_pages, min_level=1, max_level=1):
+    """
+    Extract chapter boundaries from a PDF's embedded outline/bookmarks.
+
+    Returns a list of dicts: [{"number": 1, "title": ..., "start_page": ..., "end_page": ...}, ...]
+    Returns an empty list if the PDF has no embedded outline (caller should fall back
+    to heading-detection in that case).
+
+    min_level/max_level: PDF outlines are hierarchical (level 1 = top-level chapters,
+    level 2+ = sub-sections within a chapter). Default keeps only top-level entries.
+    Widen the range if a book's "chapters" are nested one level deeper.
+    """
+    doc = pymupdf.open(file_path)
+    toc = doc.get_toc()  # returns [[level, title, page_number], ...], 1-indexed pages
+    doc.close()
+
+    if not toc:
+        return []
+
+    # Filter to the level(s) that represent actual chapters
+    entries = [(level, title.strip(), page) for level, title, page in toc
+               if min_level <= level <= max_level]
+
+    if not entries:
+        return []
+
+    # Build boundaries: each chapter runs until the next entry's start page - 1
+    chapters = []
+    for i, (level, title, start_page) in enumerate(entries):
+        if i + 1 < len(entries):
+            end_page = entries[i + 1][2] - 1
+        else:
+            end_page = total_pages
+
+        # Guard against malformed/duplicate ToC entries producing inverted ranges
+        if end_page < start_page:
+            end_page = start_page
+
+        chapters.append({
+            "number": i + 1,
+            "title": title,
+            "start_page": start_page,
+            "end_page": end_page,
+            "page_range": f"{start_page}-{end_page}"
+        })
+
+    return chapters
+
+
+def get_chapters(file_path, total_pages):
+    
+    chapters = extract_chapters_from_toc(file_path, total_pages)
+    if chapters:
+        return chapters
+    return []
+
+
+
 def chunk_headers(pages):
     
     headers_to_split_on = [

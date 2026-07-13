@@ -104,12 +104,12 @@ class ChronicleChapter(Base):
     session_id = Column(
         String, ForeignKey("rpg_sessions.id", ondelete="CASCADE"), nullable=False
     )
-    number = Column(Integer, nullable=False)
-    summary = Column(Text, nullable=True)
-    token_count = Column(Integer, nullable=False, default=0)
-    is_closed = Column(Boolean, nullable=False, default=False)
-    created_at = Column(DateTime(timezone=True), default=_now, nullable=False)
-    closed_at = Column(DateTime(timezone=True), nullable=True)
+    number = Column(Integer, nullable=False)  # e.g., 1 for Chapter 1
+    title = Column(String, nullable=False)
+    start_page = Column(Integer, nullable=False)  # e.g., 1
+    end_page = Column(Integer, nullable=False)  # e.g., 10
+    page_range = Column(String, nullable=False)  # e.g., "1-10"
+    characters = Column(JSON, nullable=True)  # list of character names or IDs
 
     session = relationship("RpgSession", back_populates="chapters")
     turns = relationship(
