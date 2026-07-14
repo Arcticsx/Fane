@@ -191,10 +191,11 @@ def store_character_spans(session_id, character):
                     character_id = character_record.character_id,
                     start_page=span["start"],
                     end_page=span["end"],
-                    chapter_number=chapter_number
+                    chapter_number=chapter_number,
                     page_count = span["page_count"]
                 )
                 db.add(character_span_record)
             
         db.commit()
         return True
+
