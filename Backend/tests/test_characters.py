@@ -1,7 +1,10 @@
-from ..App.services.process_characters import process_characters, store_characters_in_chapters
+from ..App.services.process_characters import process_characters
 from ..App.database import get_db
 from ..App.models.rpg_sessions import SourceDocument
 import sys
+
+
+
 
 def test_characters(session_id, source_doc_id):
     with get_db() as db:
@@ -27,8 +30,8 @@ def test_characters(session_id, source_doc_id):
     
 def main():
     
-    session_id = "628f28c3-15dd-4011-b317-6f9e0928c1ab"
-    source_doc_id = "bf5a5374-4019-471a-9105-98086af6f692"
+    session_id = "faa526af-254b-4b45-bd66-92019c909a26"
+    source_doc_id = "72fb366e-45ac-4bc9-b0a8-7f92c6e6404e"
     test_characters(session_id, source_doc_id)
     
 if __name__ == "__main__":
