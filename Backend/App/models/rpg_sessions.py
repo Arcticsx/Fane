@@ -134,34 +134,66 @@ class Character(Base):
     source_document_id = Column(String, ForeignKey("source_document.id", ondelete="SET NULL"), nullable=True)
     name = Column(String)
     role = Column(String)
+
+    # New fields
+    classification = Column(String, default="static")  # "static" | "arc-based"
+    total_pages = Column(Integer, default=0)
+    num_chapters_present = Column(Integer, default=0)
+
+    # Existing fields — become the "default"/fallback profile for static characters,
+    # and optionally a merged/latest view for arc-based ones (see note below)
     personality_md = Column(Text)
     backstory_md = Column(Text)
     secret = Column(Text)
 
     session = relationship("RpgSession", back_populates="characters")
-    relations_as_a = relationship(
-        "CharacterRelation",
-        foreign_keys="CharacterRelation.char_a_id",
-        back_populates="char_a",
-    )
-    relations_as_b = relationship(
-        "CharacterRelation",
-        foreign_keys="CharacterRelation.char_b_id",
-        back_populates="char_b",
-    )
     source_document = relationship("SourceDocument", back_populates="characters")
+    spans = relationship("CharacterSpan", back_populates="character", cascade="all, delete-orphan", order_by="CharacterSpan.chapter_number")
+    segments = relationship("CharacterSegment", back_populates="character", cascade="all, delete-orphan", order_by="CharacterSegment.segment_number")
+    arc_states = relationship("CharacterArcState", back_populates="character", cascade="all, delete-orphan")
 
 
-class CharacterRelation(Base):
-    __tablename__ = "character_relation"
+class CharacterSpan(Base):
+    __tablename__ = "character_span"
 
-    char_a_id = Column(String, ForeignKey("character.id"), primary_key=True)
-    char_b_id = Column(String, ForeignKey("character.id"), primary_key=True)
-    relation_type = Column(String)
-    notes = Column(Text)
+    id = Column(String, primary_key=True, default=_uuid)
+    character_id = Column(String, ForeignKey("character.id", ondelete="CASCADE"), nullable=False)
+    chapter_number = Column(Integer, nullable=False)
+    start_page = Column(Integer, nullable=False)
+    end_page = Column(Integer, nullable=False)
+    page_count = Column(Integer, nullable=False)
 
-    char_a = relationship("Character", foreign_keys=[char_a_id], back_populates="relations_as_a")
-    char_b = relationship("Character", foreign_keys=[char_b_id], back_populates="relations_as_b")
+    character = relationship("Character", back_populates="spans")
+
+
+class CharacterSegment(Base):
+    __tablename__ = "character_segment"
+
+    id = Column(String, primary_key=True, default=_uuid)
+    character_id = Column(String, ForeignKey("character.id", ondelete="CASCADE"), nullable=False)
+    segment_number = Column(Integer, nullable=False)
+    chapter_start = Column(Integer, nullable=False)
+    chapter_end = Column(Integer, nullable=False)
+
+    character = relationship("Character", back_populates="segments")
+    arc_state = relationship("CharacterArcState", back_populates="segment", uselist=False, cascade="all, delete-orphan")
+
+
+class CharacterArcState(Base):
+    __tablename__ = "character_arc_state"
+
+    id = Column(String, primary_key=True, default=_uuid)
+    character_id = Column(String, ForeignKey("character.id", ondelete="CASCADE"), nullable=False)
+    segment_id = Column(String, ForeignKey("character_segment.id", ondelete="CASCADE"), nullable=False)
+
+    personality_md = Column(Text)
+    fighting_style_md = Column(Text)
+    backstory_delta_md = Column(Text)  # what's newly revealed in this arc segment specifically
+
+    character = relationship("Character", back_populates="arc_states")
+    segment = relationship("CharacterSegment", back_populates="arc_state")
+
+
 
 
 class LoreEntry(Base):

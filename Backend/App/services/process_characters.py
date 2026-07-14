@@ -2,7 +2,7 @@ import sys
 import json
 import re
 from ..database import get_db
-from ..models.rpg_sessions import Character, SourceDocument
+from ..models.rpg_sessions import Character, SourceDocument, ChronicleChapter
 
 
 def process_characters(session_id, source_document_id, characters):
@@ -20,6 +20,9 @@ def process_characters(session_id, source_document_id, characters):
         spanned_characters.append(span_stats)
         
     print(f"[process_characters] Spanned characters:\n{format_with_inline_pages(spanned_characters)}",file=sys.stderr,)    
+    
+    store_characters_in_chapters(spanned_characters, session_id)
+    print(f"[process_characters] Stored characters in chapters for session {session_id}", file=sys.stderr)
 
 
 def rank_characters(characters):
@@ -71,3 +74,47 @@ def format_with_inline_pages(data):
         return f'"pages": [{", ".join(nums)}]'
 
     return re.sub(r'"pages":\s*\[[^\]]*\]', collapse_pages, dumped, flags=re.DOTALL)
+
+
+def store_characters_in_chapters(characters, session_id):
+    with get_db() as db:
+        chapters = (
+            db.query(ChronicleChapter)
+            .filter(ChronicleChapter.session_id == session_id)
+            .all()
+        )
+
+        if not chapters:
+            return
+
+        for chapter in chapters:
+            
+            if chapter.characters:
+                continue  # Skip if characters are already stored for this chapter   
+            
+            chapter_characters = []
+
+            for character in characters:
+                matching_spans = []
+
+                for span in character.get("spans", []):
+                    if (
+                        span["start"] <= chapter.end_page
+                        and span["end"] >= chapter.start_page
+                    ):
+                        matching_spans.append({
+                            "start": span["start"],
+                            "end": span["end"]
+                        })
+
+                if matching_spans:
+                    chapter_characters.append({
+                        "name": character["name"],
+                        "spans": matching_spans
+                    })
+
+            chapter.characters = chapter_characters
+
+        db.commit()
+        
+        

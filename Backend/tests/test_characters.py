@@ -1,4 +1,4 @@
-from ..App.services.process_characters import process_characters
+from ..App.services.process_characters import process_characters, store_characters_in_chapters
 from ..App.database import get_db
 from ..App.models.rpg_sessions import SourceDocument
 import sys
