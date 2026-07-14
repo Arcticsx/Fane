@@ -133,19 +133,11 @@ class Character(Base):
     session_id = Column(String, ForeignKey("rpg_sessions.id", ondelete="CASCADE"), nullable=False)
     source_document_id = Column(String, ForeignKey("source_document.id", ondelete="SET NULL"), nullable=True)
     name = Column(String)
-    role = Column(String)
-
-    # New fields
-    classification = Column(String, default="static")  # "static" | "arc-based"
+    
+    classification = Column(String, default="static")
     total_pages = Column(Integer, default=0)
     num_chapters_present = Column(Integer, default=0)
-
-    # Existing fields — become the "default"/fallback profile for static characters,
-    # and optionally a merged/latest view for arc-based ones (see note below)
-    personality_md = Column(Text)
-    backstory_md = Column(Text)
-    secret = Column(Text)
-
+    num_spans = Column(Integer, default=0) 
     session = relationship("RpgSession", back_populates="characters")
     source_document = relationship("SourceDocument", back_populates="characters")
     spans = relationship("CharacterSpan", back_populates="character", cascade="all, delete-orphan", order_by="CharacterSpan.chapter_number")

@@ -2,7 +2,7 @@ import sys
 import json
 import re
 from ..database import get_db
-from ..models.rpg_sessions import Character, SourceDocument, ChronicleChapter
+from ..models.rpg_sessions import Character, CharacterSpan, SourceDocument, ChronicleChapter
 
 
 def process_characters(session_id, source_document_id, characters):
@@ -23,6 +23,21 @@ def process_characters(session_id, source_document_id, characters):
     
     store_characters_in_chapters(spanned_characters, session_id)
     print(f"[process_characters] Stored characters in chapters for session {session_id}", file=sys.stderr)
+    
+    if store_characters(session_id, spanned_characters, source_document_id):
+        print(f"[process_characters] Stored characters in database for session {session_id}", file=sys.stderr)
+    else:
+        print(f"[process_characters] Failed to store characters in database for session {session_id}", file=sys.stderr)
+    
+    
+    for character in spanned_characters:
+        if store_character_spans(session_id, character):
+            print(f"[process_characters] Stored character spans in database for session {session_id}", file=sys.stderr)
+        else:
+            print(f"[process_characters] Failed to store character spans in database for session {session_id}", file=sys.stderr)
+
+    
+    
 
 
 def rank_characters(characters):
@@ -117,4 +132,69 @@ def store_characters_in_chapters(characters, session_id):
 
         db.commit()
         
+def store_characters(sessionid, characters, source_doc_id):
+    with get_db() as db:
         
+        if (db.query(Character).filter(Character.session_id == sessionid).first() is not None):
+            print(f"[store_characters] Characters already exist for session {sessionid}, skipping insertion.", file=sys.stderr)
+            return False 
+        
+        for character in characters:
+            num_chapters_present = 0
+            chapters = (
+                db.query(ChronicleChapter)
+                .filter(ChronicleChapter.session_id == sessionid)
+                .all()
+            )
+            for chapter in chapters:
+                for i in range(len(chapter.characters)):
+                    if chapter.characters[i]["name"] == character.get("name"):
+                        num_chapters_present += 1
+                        break
+
+            character_record = Character(
+                session_id=sessionid,
+                source_document_id=source_doc_id,
+                name=character.get("name"),
+                classification=character.get("classification"),
+                total_pages=character.get("total_pages"),
+                num_spans=character.get("num_spans"),
+                num_chapters_present=num_chapters_present,
+                
+            )
+            db.add(character_record)
+        db.commit()
+    return True
+
+
+def store_character_spans(session_id, character):
+    with get_db() as db:
+        chapters = (
+                db.query(ChronicleChapter)
+                .filter(ChronicleChapter.session_id == session_id)
+                .all()
+            )
+        character_record = db.query(Character).filter(Character.session_id == session_id, Character.name == character.get("name")).first()
+        if not character_record:
+            print(f"[store_character_spans] Character {character.get('name')} not found in database for session {session_id}, skipping span insertion.", file=sys.stderr)
+            return False
+   
+        for span in character.get("spans",[]):
+            chapter_number = None
+            for chapter in chapters:
+                if span["start"] <= chapter.end_page and span["end"] >= chapter.start_page:
+                    chapter_number = chapter.number
+                    break
+            if chapter_number is not None:
+                character_span_record = CharacterSpan(
+                    session_id=session_id,
+                    character_id = character_record.character_id,
+                    start_page=span["start"],
+                    end_page=span["end"],
+                    chapter_number=chapter_number
+                    page_count = span["page_count"]
+                )
+                db.add(character_span_record)
+            
+        db.commit()
+        return True
