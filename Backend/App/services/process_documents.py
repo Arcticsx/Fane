@@ -32,6 +32,13 @@ def process_document(
                 source_doc.processing_started_at = datetime.now(timezone.utc)
                 db.commit()
                 
+            '''
+            
+            Get document metadata (total pages, file size)
+            
+            '''
+            
+            
             try:
                 print(f"[process_document] Path = {temp_path}")
                 doc_meta = get_document_metadata(temp_path)
@@ -46,6 +53,15 @@ def process_document(
             else:
                 print(f"No document metadata")
 
+            
+            '''
+            
+            Extract chapters from the document
+            
+            '''
+            
+            
+            
             try:
                 chapters = get_chapters(temp_path, doc_meta["total_pages"])
                 print(f"[process_document] Extracted {len(chapters)} chapters for {temp_path}")
@@ -53,6 +69,10 @@ def process_document(
             except Exception as e:
                 print(f"[process_document] Error extracting chapters for {temp_path}: {e}", file=sys.stderr)
                 raise
+            
+            '''
+            Insert chapters into the database'''
+            
             
             if chapters:
                 print(f"[process_document] Inserting {len(chapters)} chapters into database for session {session_id}")
@@ -77,6 +97,12 @@ def process_document(
                     raise
             else:
                 print(f"No chapters extracted")
+                
+                
+            '''
+            Chunk the document and create embeddings
+            '''
+                
                         
             try:
                 chunks = chunk_document(temp_path, chunksize=500, overlap=50)
@@ -100,7 +126,12 @@ def process_document(
                     source_doc.error_message = str(e)[:1000]
                     db.commit()
                 raise
-
+            
+            '''
+            Save chunks and embeddings to vectorstore
+            '''
+            
+            
             try:
                 result = save_chunks_to_chromadb(
                     chunks=chunks,
@@ -118,6 +149,11 @@ def process_document(
                     source_doc.error_message = str(e)[:1000]
                     db.commit()
                 raise
+            
+            '''
+            Process story beats, entities, and characters
+            '''
+            
 
             try:
                 process_story_beats(session_id=session_id, source_document_id=source_doc_id)
