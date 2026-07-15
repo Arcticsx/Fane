@@ -359,57 +359,164 @@ def process_arc_records(session_id, segment_id):
             print(f"[process_arc_records] No segment found for segment_id {segment_id} in session {session_id}, skipping arc record insertion.", file=sys.stderr)
             return False
 
+        character = db.query(Character).filter(Character.id == segment.character_id).first()
+        if not character:
+            print(f"[process_arc_records] No character found for segment_id {segment_id} in session {session_id}, skipping arc record insertion.", file=sys.stderr)
+            return False
+
         chapter_start = segment.chapter_start
         chapter_end = segment.chapter_end
-        
+
         starting_chapter = db.query(ChronicleChapter).filter(
             ChronicleChapter.session_id == session_id,
             ChronicleChapter.number == chapter_start,
         ).first()
         
         ending_chapter = db.query(ChronicleChapter).filter(
-            ChronicleChapter.session_id == session_id,  
+            ChronicleChapter.session_id == session_id,
             ChronicleChapter.number == chapter_end,
         ).first()
         
         if not starting_chapter or not ending_chapter:
             print(f"[process_arc_records] Starting or ending chapter not found for segment_id {segment_id} in session {session_id}, skipping arc record insertion.", file=sys.stderr)
             return False
-        
+
         starting_page = starting_chapter.start_page
         ending_page = ending_chapter.end_page
-        
+
         chunks = query_chroma_by_page_range(
             session_id=session_id,
             start_page=starting_page,
-            end_page=ending_page,)
-        
+            end_page=ending_page,
+        )
         if not chunks:
             print(f"[process_arc_records] No chunks found for segment_id {segment_id} in session {session_id}, skipping arc record insertion.", file=sys.stderr)
             return False
-        
-        personality = []
-        backstory = []
-        fighting_style = []
-        
-        for chunk in chunks:
+
+        # Score every candidate chunk on all three axes, with name-proximity weighting
+        scored_chunks = []
+        for i, chunk in enumerate(chunks):
+            proximity = name_proximity_weight(character.name, chunk, chunks, i)
+            scored_chunks.append({
+                "chunk": chunk,
+                "personality_score": rank_personality_chunks(chunk) * proximity,
+                "backstory_score": rank_backstory_chunks(chunk) * proximity,
+                "fighting_style_score": rank_fighting_style_chunks(chunk) * proximity,
+            })
+
+        # --- Debug: print score distributions before thresholding ---
+        for key in ["personality_score", "backstory_score", "fighting_style_score"]:
+            values = sorted(sc[key] for sc in scored_chunks)
+            n = len(values)
+            if n == 0:
+                print(f"[process_arc_records] {character.name} segment {segment_id} — no chunks to score for {key}", file=sys.stderr)
+                continue
+            print(
+                f"[process_arc_records] {character.name} segment {segment_id} — {key}: "
+                f"n={n} min={values[0]:.3f} p25={values[n // 4]:.3f} "
+                f"median={values[n // 2]:.3f} p75={values[(3 * n) // 4]:.3f} max={values[-1]:.3f}",
+                file=sys.stderr
+            )
+
+        # TODO: arbitrary placeholder — replace once real distributions are reviewed
+        MIN_SCORE_THRESHOLD = 0.5
+
+        # Bin by page position within the segment's page range
+        bins = bin_chunks_by_page(scored_chunks, starting_page, ending_page, num_bins=5)
+
+        personality_pool = select_top_per_bin(bins, "personality_score", min_score=MIN_SCORE_THRESHOLD)
+        backstory_pool = select_top_per_bin(bins, "backstory_score", min_score=MIN_SCORE_THRESHOLD)
+        fighting_style_pool = select_top_per_bin(bins, "fighting_style_score", min_score=MIN_SCORE_THRESHOLD)
+
+        print(
+            f"[process_arc_records] {character.name} segment {segment_id} — pool sizes: "
+            f"personality={len(personality_pool)} backstory={len(backstory_pool)} fighting_style={len(fighting_style_pool)}",
+            file=sys.stderr
+        )
+
+        return {
+            "character_id": character.id,
+            "segment_id": segment.id,
+            "personality_pool": personality_pool,
+            "backstory_pool": backstory_pool,
+            "fighting_style_pool": fighting_style_pool,
+        }
             
-            personality.append(rank_backstory_chunks(chunk))
-            backstory.append(rank_personality_chunks(chunk))
-            fighting_style.append(rank_fighting_style_chunks(chunk))    
             
-            pass
             
 
 def rank_personality_chunks(chunk):
-    
-    pass
+    text = chunk["text"] or ""
+    dialogue_score = text.count('"') / 2
+    emotion_words = ["felt", "wondered", "feared", "hoped", "laughed", "snapped", "smiled", "wished"]
+    emotion_score = sum(text.lower().count(w) for w in emotion_words)
+    word_count = max(len(text.split()), 1)
+    return (dialogue_score * 1.0 + emotion_score * 1.5) / word_count * 1000
+
 
 def rank_backstory_chunks(chunk):
-    pass
+    text = chunk["text"] or ""
+    retrospective_words = ["had been", "used to", "years ago", "remembered", "grew up", "once was"]
+    retro_score = sum(text.lower().count(w) for w in retrospective_words)
+    header_text = " ".join(filter(None, [chunk.get("section"), chunk.get("subsection")])).lower()
+    header_boost = 5 if any(kw in header_text for kw in ["origin", "past", "history", "before"]) else 0
+    word_count = max(len(text.split()), 1)
+    return (retro_score * 2.0 + header_boost) / word_count * 1000
+
 
 def rank_fighting_style_chunks(chunk):
-    pass     
+    text = chunk["text"] or ""
+    combat_words = ["sword", "struck", "dodged", "blocked", "parried", "charged", "attacked", "blade", "fought"]
+    combat_score = sum(text.lower().count(w) for w in combat_words)
+    header_text = " ".join(filter(None, [chunk.get("section"), chunk.get("subsection")])).lower()
+    header_boost = 5 if any(kw in header_text for kw in ["battle", "duel", "fight", "war"]) else 0
+    word_count = max(len(text.split()), 1)
+    return (combat_score * 2.0 + header_boost) / word_count * 1000
+
+
+def name_proximity_weight(character_name, chunk, all_chunks, index):
+    text = chunk["text"] or ""
+    if character_name.lower() in text.lower():
+        return 1.0
+
+    # Check adjacent chunks via position in the already page/start_index-ordered list
+    neighbors = []
+    if index > 0:
+        neighbors.append(all_chunks[index - 1])
+    if index < len(all_chunks) - 1:
+        neighbors.append(all_chunks[index + 1])
+
+    for neighbor in neighbors:
+        if character_name.lower() in (neighbor["text"] or "").lower():
+            return 0.6
+
+    return 0.25  # low baseline — not nearby, but not excluded outright
+
+
+def bin_chunks_by_page(scored_chunks, start_page, end_page, num_bins=5):
+    total_span = max(end_page - start_page + 1, 1)
+    num_bins = max(1, min(num_bins, total_span))
+    bin_size = total_span / num_bins
+
+    bins = [[] for _ in range(num_bins)]
+    for sc in scored_chunks:
+        page = sc["chunk"]["page"] or start_page
+        bin_index = int((page - start_page) / bin_size)
+        bin_index = min(bin_index, num_bins - 1)  # guard against edge rounding at end_page
+        bins[bin_index].append(sc)
+
+    return bins
+
+
+def select_top_per_bin(bins, score_key, min_score=0.0):
+    pool = []
+    for bin_chunks in bins:
+        if not bin_chunks:
+            continue
+        best = max(bin_chunks, key=lambda sc: sc[score_key])
+        if best[score_key] >= min_score:
+            pool.append(best["chunk"])
+    return pool   
             
             
 

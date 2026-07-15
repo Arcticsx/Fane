@@ -9,6 +9,14 @@ from .vectorstore import save_chunks_to_chromadb
 from .process_story_beats import process_story_beats
 from .process_entities import process_entities
 from .process_characters import process_characters
+from ...tests.test_characters import characters
+
+
+
+# THIS IS A TEST DATASET FOR CHARACTERS
+
+
+
 from ..models.document_status import update_phase_status
 
 def process_document(
