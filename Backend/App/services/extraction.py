@@ -175,7 +175,7 @@ def extract_beats_from_window(session_id, source_doc_id, start_page, end_page):
     approx_tokens = len(prompt) // 4  # rough chars-to-tokens estimate
     print(f"[DEBUG] window {start_page}-{end_page}: ~{approx_tokens} tokens, {len(chunks)} chunks")
     
-    response = get_response(prompt, mode="chronicle")
+    response = get_response(prompt, mode="chronicle_beats")
     print(response)
     beats = _parse_json_response(response)
     
@@ -295,13 +295,13 @@ Do NOT include 'order' – that will be assigned later.
          f"(~{prompt_chars // 4} tokens)")
 
     try:
-        response = get_response(prompt, mode="chronicle")
+        response = get_response(prompt, mode="chronicle_beats")
         _dbg(f"reduce_cluster: raw response_len={len(response)} chars, "
             f"head={response[:120]!r}")
     except Exception as e:
         print(f"[reduce_cluster] Error calling LLM for cluster reduction: {e}", file=sys.stderr)
         time.sleep(15)  # back off a bit before retrying
-        response = get_response(prompt, mode="chronicle")
+        response = get_response(prompt, mode="chronicle_beats")
     finally:
         time.sleep(3)  # cooldown between LLM calls
 
