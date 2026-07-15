@@ -12,6 +12,7 @@ from sqlalchemy import (
 )
 from sqlalchemy.orm import relationship
 from .dbbase import Base
+from .document_status import default_status
 
 def _uuid() -> str:
     return str(uuid.uuid4())
@@ -76,7 +77,7 @@ class SourceDocument(Base):
     id = Column(String, primary_key=True, default=_uuid)
     session_id = Column(String, ForeignKey("rpg_sessions.id", ondelete="CASCADE"), nullable=False)
     filename = Column(String, nullable=False)
-    status = Column(String, nullable=False, default="pending")
+    status = Column(JSON, nullable=False, default=default_status)
     chunk_count = Column(Integer, default=0)
     uploaded_at = Column(DateTime(timezone=True), default=_now, nullable=False)
     processing_started_at = Column(DateTime(timezone=True), nullable=True)
