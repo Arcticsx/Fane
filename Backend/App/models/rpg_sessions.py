@@ -163,6 +163,7 @@ class CharacterSegment(Base):
 
     id = Column(String, primary_key=True, default=_uuid)
     character_id = Column(String, ForeignKey("character.id", ondelete="CASCADE"), nullable=False)
+    character_name = Column(String, nullable=False)
     segment_number = Column(Integer, nullable=False)
     chapter_start = Column(Integer, nullable=False)
     chapter_end = Column(Integer, nullable=False)
@@ -177,7 +178,8 @@ class CharacterArcState(Base):
     id = Column(String, primary_key=True, default=_uuid)
     character_id = Column(String, ForeignKey("character.id", ondelete="CASCADE"), nullable=False)
     segment_id = Column(String, ForeignKey("character_segment.id", ondelete="CASCADE"), nullable=False)
-
+    character_name = Column(String, nullable=False)
+    segment_number = Column(Integer, nullable=False)
     personality_md = Column(Text)
     fighting_style_md = Column(Text)
     backstory_delta_md = Column(Text)  # what's newly revealed in this arc segment specifically

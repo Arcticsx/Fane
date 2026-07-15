@@ -30,8 +30,8 @@ def test_characters(session_id, source_doc_id):
     
 def main():
     
-    session_id = "faa526af-254b-4b45-bd66-92019c909a26"
-    source_doc_id = "72fb366e-45ac-4bc9-b0a8-7f92c6e6404e"
+    session_id = "0c6670ab-41bb-45c6-bb04-ca42752d2d0a"
+    source_doc_id = "09a75960-f466-40e7-918d-842f88bd4f8b"
     test_characters(session_id, source_doc_id)
     
 if __name__ == "__main__":

@@ -2,8 +2,8 @@ import sys
 import json
 import re
 from ..database import get_db
-from ..models.rpg_sessions import Character, CharacterSegment, CharacterSpan, SourceDocument, ChronicleChapter
-
+from ..models.rpg_sessions import Character, CharacterArcState, CharacterSegment, CharacterSpan, SourceDocument, ChronicleChapter
+from .vectorstore import query_chroma_by_page_range
 
 def process_characters(session_id, source_document_id, characters):
     
@@ -46,7 +46,25 @@ def process_characters(session_id, source_document_id, characters):
             print(f"[process_characters] Persisted character segments in database for session {session_id}", file=sys.stderr)
         else:
             print(f"[process_characters] Failed to persist character segments in database for session {session_id}", file=sys.stderr)
-
+    
+    
+    characters = db.query(Character).filter(Character.session_id == session_id).all()
+    for character in characters:
+        if character.classification == "arc-based":
+            segments = db.query(CharacterSegment).filter(CharacterSegment.character_id == character.id).all()
+            for segment in segments:
+                arc_state = db.query(CharacterArcState).filter(
+                    CharacterArcState.character_id == character.id,
+                    CharacterArcState.segment_id == segment.id
+                ).first()
+                if not arc_state:
+                    process_arc_records(session_id, segment.id)
+                    print(f"[process_characters] Processed arc records for character {character.name} and segment {segment.segment_number} in session {session_id}", file=sys.stderr)
+                else:
+                    print(f"[process_characters] Arc record already exists for character {character.name} and segment {segment.segment_number} in session {session_id}, skipping.", file=sys.stderr)
+    
+    
+    
 def rank_characters(characters):
     return sorted(characters, key=lambda c: (c.get("total_pages", 0), len(c.get("spans", []))), reverse=True)
 
@@ -325,6 +343,7 @@ def persist_character_segments(session_id, character):
         for segment in character.get("segments", []):
             db.add(CharacterSegment(
                 character_id=character_record.id,
+                character_name=character.get("name"),
                 segment_number=segment.get("segment_number"),
                 chapter_start=segment.get("chapter_start"),
                 chapter_end=segment.get("chapter_end")
@@ -332,3 +351,84 @@ def persist_character_segments(session_id, character):
 
         db.commit()
     return True
+
+def process_arc_records(session_id, segment_id):
+    with get_db() as db:
+        segment = db.query(CharacterSegment).filter(CharacterSegment.id == segment_id).first()
+        if not segment:
+            print(f"[process_arc_records] No segment found for segment_id {segment_id} in session {session_id}, skipping arc record insertion.", file=sys.stderr)
+            return False
+
+        chapter_start = segment.chapter_start
+        chapter_end = segment.chapter_end
+        
+        starting_chapter = db.query(ChronicleChapter).filter(
+            ChronicleChapter.session_id == session_id,
+            ChronicleChapter.number == chapter_start,
+        ).first()
+        
+        ending_chapter = db.query(ChronicleChapter).filter(
+            ChronicleChapter.session_id == session_id,  
+            ChronicleChapter.number == chapter_end,
+        ).first()
+        
+        if not starting_chapter or not ending_chapter:
+            print(f"[process_arc_records] Starting or ending chapter not found for segment_id {segment_id} in session {session_id}, skipping arc record insertion.", file=sys.stderr)
+            return False
+        
+        starting_page = starting_chapter.start_page
+        ending_page = ending_chapter.end_page
+        
+        chunks = query_chroma_by_page_range(
+            session_id=session_id,
+            start_page=starting_page,
+            end_page=ending_page,)
+        
+        if not chunks:
+            print(f"[process_arc_records] No chunks found for segment_id {segment_id} in session {session_id}, skipping arc record insertion.", file=sys.stderr)
+            return False
+        
+        personality = []
+        backstory = []
+        fighting_style = []
+        
+        for chunk in chunks:
+            
+            personality.append(rank_backstory_chunks(chunk))
+            backstory.append(rank_personality_chunks(chunk))
+            fighting_style.append(rank_fighting_style_chunks(chunk))    
+            
+            pass
+            
+
+def rank_personality_chunks(chunk):
+    
+    pass
+
+def rank_backstory_chunks(chunk):
+    pass
+
+def rank_fighting_style_chunks(chunk):
+    pass     
+            
+            
+
+
+def persist_arc_records(session_id):
+    with get_db() as db:
+        characters = db.query(Character).filter(Character.session_id == session_id).all()
+        if db.query(CharacterArcState).filter(CharacterArcState.character_id.in_([c.id for c in characters])).first() is not None:
+            print(f"[persist_arc_records] Arc records already exist for session {session_id}, skipping insertion.", file=sys.stderr)
+            return False
+        for character in characters:
+            if character.classification == "arc-based":
+                segments = db.query(CharacterSegment).filter(CharacterSegment.character_id == character.id).all()
+                for segment in segments:
+                    
+                    db.add(CharacterArcState(
+                        character_id=character.id,
+                        character_name=character.name,
+                        segment_id= segment.id,
+                        segment_number=segment.segment_number,
+                    ))
+        db.commit()

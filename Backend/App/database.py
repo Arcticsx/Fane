@@ -7,9 +7,9 @@ try:
     from .models import Session, Message, Context
     from .models.dbbase import Base
 except ImportError:
-    from models import Personality
-    from models import Session, Message, Context
-    from models.dbbase import Base
+    from .models import Personality
+    from .models import Session, Message, Context
+    from .models.dbbase import Base
 
 from sqlalchemy import create_engine, inspect, text
 from sqlalchemy.orm import sessionmaker
