@@ -31,7 +31,7 @@ def process_document(
             if source_doc:
                 source_doc.processing_started_at = datetime.now(timezone.utc)
                 db.commit()
-
+                
             try:
                 print(f"[process_document] Path = {temp_path}")
                 doc_meta = get_document_metadata(temp_path)
