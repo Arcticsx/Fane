@@ -28,11 +28,10 @@ from ..services.chat.database import (
     get_recent_sessions,
     get_sessions,
     delete_session,
-    DATA_DIR,
 )
 from ..services.utility.response import get_response
 from ..services.chat.memory import trim_memory
-from ..services.utility.config import textPrompt
+from ..services.utility.config import textPrompt, DATA_DIR
 from ..services.utility.getdb import init_db, get_db
 
 import os

@@ -6,7 +6,7 @@ import sys
 
 load_dotenv()
 
-BASE_DIR = Path(__file__).resolve().parent.parent
+BASE_DIR = Path(__file__).resolve().parent.parent.parent.parent
 DATA_DIR = BASE_DIR / "data"
 
 # Core settings read from environment

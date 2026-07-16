@@ -2,6 +2,8 @@ import sys
 import json
 import re
 
+from Backend.App.services.utility.utility_functions import estimate_tokens
+
 from ..utility.response import get_response
 from ..utility.getdb import get_db
 from ...models.rpg_sessions import Character, CharacterArcState, CharacterSegment, CharacterSpan, SourceDocument, ChronicleChapter
@@ -132,15 +134,17 @@ def process_characters(session_id, source_document_id, characters):
                 print(f"[process_characters] Processed arc records for character {character.name} and segment {segment.segment_number} in session {session_id}", file=sys.stderr)
             else:
                 print(f"[process_characters] Arc record already exists for character {character.name} and segment {segment.segment_number} in session {session_id}, skipping.", file=sys.stderr)
-    
+    arc_records = []
     for arc_state in arc_states:
         if arc_state is None:
             continue
-        if persist_arc_records(session_id, arc_state, character_id=arc_state["character_id"], segment_id=arc_state["segment_id"]):
-            print(f"[process_characters] Persisted arc records in database for session {session_id}", file=sys.stderr)
-        else:
-            print(f"[process_characters] Failed to persist arc records in database for session {session_id}", file=sys.stderr)
-    
+        try:
+            arc_records.append(persist_arc_records(session_id, arc_state))
+        except Exception as e:
+            print(f"[process_characters] Error persisting arc records for character_id {arc_state['character_id']} and segment_id {arc_state['segment_id']} in session {session_id}: {e}", file=sys.stderr)
+            continue
+        
+    print(arc_records)
     
 
 def rank_characters(characters):
@@ -651,18 +655,41 @@ def persist_arc_records(session_id, arc_state, character_id, segment_id):
         ).first()
         if existing_arc_state:
             return False  # Arc state already exists, skip insertion
-        personality_chunks = prepare_pool_for_synthesis(arc_state["personality_pool"], token_budget=4000)
-        backstory_chunks = prepare_pool_for_synthesis(arc_state["backstory_pool"], token_budget=4000)
-        fighting_style_chunks = prepare_pool_for_synthesis(arc_state["fighting_style_pool"], token_budget=4000)
+        
+        character_name = db.query(Character).filter(Character.id == arc_state["character_id"]).first().name
+        
+        """
+        PREPARE DATA FOR SYNTHESIS
+        """
+        
+        
+        personality_chunks = prepare_pool_for_synthesis(arc_state["personality_pool"], token_budget=4000 - estimate_tokens(PERSONALITY_PROMPT))
+        backstory_chunks = prepare_pool_for_synthesis(arc_state["backstory_pool"], token_budget=4000 - estimate_tokens(BACKSTORY_PROMPT))
+        fighting_style_chunks = prepare_pool_for_synthesis(arc_state["fighting_style_pool"], token_budget=4000 - estimate_tokens(FIGHTING_STYLE_PROMPT))
+        
+        """
+        GET CHARACTER PERSONALITY, BACKSTORY, AND FIGHTING STYLE FROM LLM
+        """
+        
         print(f"[persist_arc_records] Extracting personality for character_id {arc_state['character_id']} and segment_id {arc_state['segment_id']} in session {session_id}", file=sys.stderr)
-        personality = get_response(PERSONALITY_PROMPT.format(character_name=arc_state["character_id"], data=personality_chunks), mode="characters", type="personality")
-        print(personality)
+        print(f"[persist_arc_records] Input tokens: {estimate_tokens(PERSONALITY_PROMPT.format(character_name=character_name, data=personality_chunks))}", file=sys.stderr)
+        personality = get_response(PERSONALITY_PROMPT.format(character_name=character_name, data=personality_chunks), mode="characters", type="personality")
+        
+        
         print(f"[persist_arc_records] Extracting backstory for character_id {arc_state['character_id']} and segment_id {arc_state['segment_id']} in session {session_id}", file=sys.stderr)
-        backstory = get_response(BACKSTORY_PROMPT.format(character_name=arc_state["character_id"], data=backstory_chunks), mode="characters", type="backstory")
-        print(backstory)
+        print(f"[persist_arc_records] Input tokens: {estimate_tokens(BACKSTORY_PROMPT.format(character_name=character_name, data=backstory_chunks))}", file=sys.stderr)
+        backstory = get_response(BACKSTORY_PROMPT.format(character_name=character_name, data=backstory_chunks), mode="characters", type="backstory")
+        
+        
         print(f"[persist_arc_records] Extracting fighting style for character_id {arc_state['character_id']} and segment_id {arc_state['segment_id']} in session {session_id}", file=sys.stderr)
-        fighting_style = get_response(FIGHTING_STYLE_PROMPT.format(character_name=arc_state["character_id"], data=fighting_style_chunks), mode="characters", type="fighting_style")
-        print(fighting_style)
+        print(f"[persist_arc_records] Input tokens: {estimate_tokens(FIGHTING_STYLE_PROMPT.format(character_name=character_name, data=fighting_style_chunks))}", file=sys.stderr)
+        
+        fighting_style = get_response(FIGHTING_STYLE_PROMPT.format(character_name=character_name, data=fighting_style_chunks), mode="characters", type="fighting_style")
+       
+        """
+        SAVE CHARACTER ARC STATE TO DATABASE
+        """
+
         arc_state_record = CharacterArcState(
             character_id=arc_state["character_id"],
             segment_id=arc_state["segment_id"],
@@ -672,9 +699,15 @@ def persist_arc_records(session_id, arc_state, character_id, segment_id):
             backstory_delta_md=backstory,
             fighting_style_md=fighting_style
         )
-        print(f"[persist_arc_records] About to INSERT character_id={arc_state['character_id']} "
-            f"segment_id={arc_state['segment_id']}", file=sys.stderr)
         db.add(arc_state_record)
         db.commit()
         print(f"[persist_arc_records] COMMITTED id={arc_state_record.id}", file=sys.stderr)
-        return True
+        return {
+            "character_id": arc_state_record.character_id,
+            "segment_id": arc_state_record.segment_id,
+            "character_name": arc_state_record.character_name,
+            "segment_number": arc_state_record.segment_number,
+            "personality_md": arc_state_record.personality_md,
+            "backstory_delta_md": arc_state_record.backstory_delta_md,
+            "fighting_style_md": arc_state_record.fighting_style_md
+        }

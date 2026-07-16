@@ -13,7 +13,6 @@ except ImportError:
 
 from sqlalchemy import create_engine, inspect, text
 from sqlalchemy.orm import sessionmaker
-from ..utility.config import BASE_DIR, DATA_DIR
 from ..utility.getdb import get_db
 
 

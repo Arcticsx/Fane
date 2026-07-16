@@ -10,6 +10,7 @@ from ..beats.process_story_beats import process_story_beats
 from ..entities.process_entities import process_entities
 from ..entities.process_characters import process_characters
 from ...models.document_status import update_phase_status
+from ....tests.test_characters import characters
 
 def process_document(
     source_doc_id: str,
