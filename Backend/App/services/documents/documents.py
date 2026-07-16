@@ -7,10 +7,7 @@ from sentence_transformers import SentenceTransformer
 import pymupdf
 import os
 
-try:
-    from ..config import EMBEDDING_MODEL
-except ImportError:
-    from config import EMBEDDING_MODEL
+from ..utility.config import EMBEDDING_MODEL
 
 
 def normalize_text(text):

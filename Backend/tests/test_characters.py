@@ -1,5 +1,5 @@
-from ..App.services.process_characters import process_characters
-from ..App.database import get_db
+from ..App.services.entities.process_characters import process_characters
+from ..App.services.utility.getdb import get_db
 from ..App.models.rpg_sessions import SourceDocument
 import sys
 

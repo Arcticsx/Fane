@@ -1,8 +1,5 @@
 # Handles conversation summarization and memory trimming
-try:
-    from .response import get_response
-except ImportError:
-    from response import get_response
+from ..utility.response import get_response
 
 def summarize(messages):
     # Sends the raw message list to the LLM and returns a plain-text summary

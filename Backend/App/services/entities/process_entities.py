@@ -2,13 +2,13 @@ from os import name
 import sys
 import time
 
-from Backend.App.models.rpg_sessions import SourceDocument
-from Backend.App.response import get_response
-from Backend.App.services.extraction import _assemble_pages_text, _normalize_beat, _parse_json_response, extract_beats_from_window
-from Backend.App.services.vectorstore import query_chroma_by_page_range
+from ...models.rpg_sessions import SourceDocument
+from ..utility.response import get_response
+from ..beats.extraction import _assemble_pages_text, _normalize_beat, _parse_json_response, extract_beats_from_window
+from ..documents.vectorstore import query_chroma_by_page_range
 from .entities_reduce import merge_entity_clusters
-from .documents import generate_page_windows
-from ..database import get_db
+from ..documents.documents import generate_page_windows
+from ..utility.getdb import get_db
 SYSTEM_PROMPT = '''
 You are an entity extraction system for a narrative processing pipeline. Given a chunk of novel text, covering pages {start_page}-{end_page}, extract every distinct named entity that is explicitly present in the text.
 

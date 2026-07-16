@@ -3,10 +3,7 @@
 import time
 from langchain_openai import ChatOpenAI
 
-try:
-    from .config import AISUITE_MODEL, PROVIDER, API_KEY
-except ImportError:
-    from config import AISUITE_MODEL, PROVIDER, API_KEY
+from .config import AISUITE_MODEL, PROVIDER, API_KEY
 
 BEAT_SCHEMA = {
     "type": "array",

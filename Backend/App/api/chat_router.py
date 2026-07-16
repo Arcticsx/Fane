@@ -14,14 +14,14 @@ from sqlalchemy.orm import Session
 
 from .chronicle_router import router as chronicle_router
 from .documents_router import router as documents_router
-from ..personalities import (
+from ..services.chat.personalities import (
     get_personalities,
     create_personality,
     update_personality,
     delete_personality,
     pick_personality,
 )
-from ..database import (
+from ..services.chat.database import (
     save_session,
     load_session,
     get_session_by_index,
@@ -29,12 +29,11 @@ from ..database import (
     get_sessions,
     delete_session,
     DATA_DIR,
-    init_db,
-    get_db
 )
-from ..response import get_response
-from ..memory import trim_memory
-from ..config import textPrompt
+from ..services.utility.response import get_response
+from ..services.chat.memory import trim_memory
+from ..services.utility.config import textPrompt
+from ..services.utility.getdb import init_db, get_db
 
 import os
 import shutil

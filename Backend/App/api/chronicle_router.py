@@ -9,7 +9,7 @@ from fastapi import APIRouter, Depends, File, Form, HTTPException, UploadFile
 from pydantic import BaseModel
 from sqlalchemy.orm import Session
 
-from ..database import get_db_session
+from ..services.utility.getdb import get_db_session
 from ..models.rpg_sessions import (
     ChronicleChapter,
     ChronicleMessages,
@@ -19,9 +19,9 @@ from ..models.rpg_sessions import (
     StoryEvent,
     TurnLog,
 )
-from ..response import get_response
-from ..services.vectorstore import query_chroma_for_lore
-from ..config import DATA_DIR
+from ..services.utility.response import get_response
+from ..services.documents.vectorstore import query_chroma_for_lore
+from ..services.utility.config import DATA_DIR
 
 router = APIRouter(prefix="/story", tags=["chronicle"])
 AVATAR_DIR = Path(DATA_DIR) / "images"

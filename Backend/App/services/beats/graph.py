@@ -5,7 +5,7 @@ from narwhals import List
 from pyparsing import Dict
 import sqlalchemy
 
-from ..models.rpg_sessions import GraphEdge, StoryBeat
+from ...models.rpg_sessions import GraphEdge, StoryBeat
 
 
 @dataclass

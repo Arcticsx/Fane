@@ -1,6 +1,6 @@
 {
   "scripts": {
-    "backend": "uvicorn Backend.App.main:app --reload",
+    "backend": "./venv/bin/uvicorn Backend.App.main:app --reload",
     "frontend": "cd frontend && npm run dev",
     "fboth": "npm-run-all --parallel backend frontend",
     "postinstall": "cd frontend && npm install"

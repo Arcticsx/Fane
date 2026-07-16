@@ -1,22 +1,15 @@
-try:
-    from .vectorstore import query_chroma_by_page_range
-except ImportError:
-    from vectorstore import query_chroma_by_page_range
-
-try:
-    from ..response import get_response
-except ImportError:
-    from response import get_response
+from ..documents.vectorstore import query_chroma_by_page_range
+from ..utility.response import get_response
 
 import json
 import re
 import time
 import sys
-from ..database import get_db
-from ..models.rpg_sessions import StoryBeat
+from ..utility.getdb import get_db
+from ...models.rpg_sessions import StoryBeat
 from typing import List, Dict, Any, Set
 from difflib import get_close_matches
-from ..config import _dbg
+from ..utility.config import _dbg
 
 SYSTEM_PROMPT = '''
 You are a Narrative Architect. Extract ALL story beats from the novel text below, covering pages {start_page}-{end_page}.

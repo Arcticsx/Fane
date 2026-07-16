@@ -9,7 +9,7 @@ import sys
 import json
 import re
 from typing import List, Dict
-from ..config import _dbg
+from ..utility.config import _dbg
 
 
 def run_reduce_phase(db, session_id, candidate_beats, source_doc_id):

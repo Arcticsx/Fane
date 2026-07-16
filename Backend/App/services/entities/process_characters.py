@@ -2,11 +2,11 @@ import sys
 import json
 import re
 
-from Backend.App.response import get_response
-from ..database import get_db
-from ..models.rpg_sessions import Character, CharacterArcState, CharacterSegment, CharacterSpan, SourceDocument, ChronicleChapter
-from .vectorstore import query_chroma_by_page_range
-from .documents import token_length
+from ..utility.response import get_response
+from ..utility.getdb import get_db
+from ...models.rpg_sessions import Character, CharacterArcState, CharacterSegment, CharacterSpan, SourceDocument, ChronicleChapter
+from ..documents.vectorstore import query_chroma_by_page_range
+from ..documents.documents import token_length
 
 PERSONALITY_PROMPT = """Analyze the personality of {character_name} using ONLY the provided non-continuous excerpts. No outside knowledge. Base all claims on text evidence; do not invent traits. Distinguish shown behavior from "(implied)" inferences and flag "(secondhand)" accounts. Do not summarize plot. Use a neutral, descriptive tone. If evidence is thin, set "has_sufficient_data" to false.
 

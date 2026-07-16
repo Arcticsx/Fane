@@ -1,5 +1,5 @@
-from ..database import get_db
-from ..models.rpg_sessions import RpgSession
+from ..utility.getdb import get_db
+from ...models.rpg_sessions import RpgSession
 
 def create_session(title, synopsis, genre, magic_rules_md = "", context_token_limit = ""):
     

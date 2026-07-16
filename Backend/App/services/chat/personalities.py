@@ -1,9 +1,5 @@
-try:
-    from .database import get_db
-    from .models import Personality, Session
-except ImportError:
-    from database import get_db
-    from models import Personality, Session
+from ..utility.getdb import get_db
+from ...models import Personality, Session
 
 # Optional legacy Mongo-like collection used in older tests/local mocks
 personalities_col = globals().get("personalities_col", None)

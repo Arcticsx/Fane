@@ -1,8 +1,5 @@
 import sys
-try:
-    from ..config import CHROMA_PERSIST_DIR
-except ImportError:
-    from config import CHROMA_PERSIST_DIR
+from ..utility.config import CHROMA_PERSIST_DIR
 import chromadb
 import uuid
 from typing import List, Dict, Any, Optional

@@ -1,15 +1,13 @@
 import os
 import sys
 
-from ..database import get_db
-from ..models.rpg_sessions import RpgSession, SourceDocument
-from .documents import generate_page_windows
+from ..utility.getdb import get_db
+from ...models.rpg_sessions import RpgSession, SourceDocument
+from ..documents.documents import generate_page_windows
 from .extraction import extract_beats_from_window, replace_candidates_with_final_beats, save_candidate_beats
 # from .beats_reduce import run_reduce_phase
 from .beats_graph import run_graph_phase
-
-
-from ...tests.test_chronicle import extract_candidate_beats, run_reduce_phase
+from ....tests.test_chronicle import extract_candidate_beats, run_reduce_phase
 
 def process_story_beats(
     session_id: str,
@@ -46,22 +44,20 @@ def process_story_beats(
                 #             f"for {source_document_id}: {e}",
                 #             file=sys.stderr,
                 #         )
-                #         # If the local model server itself is down, back off harder before
-                #         # hammering it with the next window's request.
                 #         if "connection refused" in str(e).lower() or "server disconnected" in str(e).lower():
                 #             print(f"[process_story_beats] Ollama appears unresponsive, backing off 15s", file=sys.stderr)
                 #             time.sleep(15)
                 #             beats = extract_beats_from_window(session_id, source_document_id, start_page, end_page)
+                #             candidate_beats.extend(beats)
+                #             consecutive_failures = 0
                 #         if consecutive_failures >= 5:
                 #             raise RuntimeError(
                 #                 f"Too many consecutive extraction failures ({consecutive_failures}); "
                 #                 f"aborting rather than continuing to degrade"
                 #             )
                 #     finally:
-                #         time.sleep(3)  # cooldown between every window, success or failure
-                
+                #         time.sleep(3)
                 candidate_beats = extract_candidate_beats()
-
                 if not candidate_beats:
                     raise ValueError("No beats extracted")
                 else:
