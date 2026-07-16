@@ -150,6 +150,7 @@ class CharacterSpan(Base):
     __tablename__ = "character_span"
 
     id = Column(String, primary_key=True, default=_uuid)
+    character_name = Column(String, nullable=False)
     character_id = Column(String, ForeignKey("character.id", ondelete="CASCADE"), nullable=False)
     chapter_number = Column(Integer, nullable=False)
     start_page = Column(Integer, nullable=False)

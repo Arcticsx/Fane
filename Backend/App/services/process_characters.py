@@ -50,18 +50,18 @@ def process_characters(session_id, source_document_id, characters):
     
     characters = db.query(Character).filter(Character.session_id == session_id).all()
     for character in characters:
-        if character.classification == "arc-based":
-            segments = db.query(CharacterSegment).filter(CharacterSegment.character_id == character.id).all()
-            for segment in segments:
-                arc_state = db.query(CharacterArcState).filter(
-                    CharacterArcState.character_id == character.id,
-                    CharacterArcState.segment_id == segment.id
-                ).first()
-                if not arc_state:
-                    process_arc_records(session_id, segment.id)
-                    print(f"[process_characters] Processed arc records for character {character.name} and segment {segment.segment_number} in session {session_id}", file=sys.stderr)
-                else:
-                    print(f"[process_characters] Arc record already exists for character {character.name} and segment {segment.segment_number} in session {session_id}, skipping.", file=sys.stderr)
+       
+        segments = db.query(CharacterSegment).filter(CharacterSegment.character_id == character.id).all()
+        for segment in segments:
+            arc_state = db.query(CharacterArcState).filter(
+                CharacterArcState.character_id == character.id,
+                CharacterArcState.segment_id == segment.id
+            ).first()
+            if not arc_state:
+                process_arc_records(session_id, segment.id)
+                print(f"[process_characters] Processed arc records for character {character.name} and segment {segment.segment_number} in session {session_id}", file=sys.stderr)
+            else:
+                print(f"[process_characters] Arc record already exists for character {character.name} and segment {segment.segment_number} in session {session_id}, skipping.", file=sys.stderr)
     
     
     
@@ -75,9 +75,9 @@ def span_statistic_of_character(character, book_total_pages):
 
     size_threshold = 0.15 * book_total_pages
     gap_threshold = 0.05 * book_total_pages
-    QUALIFYING_SPAN_FLOOR = 3  # spans shorter than this are cameo noise, ignored for arc detection
+    QUALIFYING_SPAN_FLOOR = 1  # lowered — even 1-page appearances count if the pattern recurs
+    MIN_RECURRING_SPANS = 4    # new: raw appearance count alone can justify arc-based
 
-    # Filter out cameo-length spans before evaluating count/gap
     qualifying_spans = [s for s in spans if s["page_count"] >= QUALIFYING_SPAN_FLOOR]
     num_qualifying = len(qualifying_spans)
 
@@ -87,9 +87,10 @@ def span_statistic_of_character(character, book_total_pages):
             gap = qualifying_spans[i + 1]["start"] - qualifying_spans[i]["end"]
             max_gap = max(max_gap, gap)
 
-    if total_pages >= size_threshold or (
-        num_qualifying > 1
-        and max_gap > gap_threshold
+    is_frequent_recurrence = num_spans >= MIN_RECURRING_SPANS
+
+    if total_pages >= size_threshold or is_frequent_recurrence or (
+        num_qualifying > 1 and max_gap > gap_threshold
     ):
         classification = "arc-based"
     else:
@@ -226,6 +227,7 @@ def persist_character_spans(session_id, character):
             if chapter_number is not None:
                 character_span_record = CharacterSpan(
                     character_id = character_record.id,
+                    character_name = character.get("name"),
                     start_page=span["start"],
                     end_page=span["end"],
                     chapter_number=chapter_number,
@@ -237,27 +239,29 @@ def persist_character_spans(session_id, character):
         return True
 
 
-def segment_characters(characters, book_total_chapters, gap_threshold_ratio=0.15, min_gap_chapters=2):
+def segment_characters(characters, book_total_chapters, gap_threshold_ratio=0.15, min_gap_chapters=2,
+                        min_chapters_per_segment=4, max_segments=6):
 
     gap_threshold = max(min_gap_chapters, round(gap_threshold_ratio * book_total_chapters))
 
     for character in characters:
-        if character.get("classification") == "arc-based":
-            chapters = list(dict.fromkeys([
+        classification = character.get("classification")
+
+        if classification == "arc-based":
+            chapters = sorted(set(
                 span.get("chapter_number") for span in character.get("spans", [])
                 if span.get("chapter_number") is not None
-            ]))
-            chapters.sort()
+            ))
 
             if not chapters:
                 character["segments"] = []
                 continue
 
-            # Determine presence pattern: continuous vs clustered
-            span_of_range = chapters[-1] - chapters[0] + 1
+            first_chapter = chapters[0]
+            last_chapter = chapters[-1]
+            span_of_range = last_chapter - first_chapter + 1
             coverage_ratio = len(chapters) / span_of_range if span_of_range > 0 else 1.0
 
-            # Check largest gap between consecutive present-chapters
             max_gap = 0
             for i in range(len(chapters) - 1):
                 gap = chapters[i + 1] - chapters[i]
@@ -265,28 +269,31 @@ def segment_characters(characters, book_total_chapters, gap_threshold_ratio=0.15
 
             is_continuous = max_gap <= gap_threshold or coverage_ratio >= 0.6
 
-            segments = []
             if is_continuous:
-                # Continuous path: divide the full chapter range into fixed-size blocks
-                num_segments = max(1, min(6, book_total_chapters // 4))
-                first_chapter = chapters[0]
-                last_chapter = chapters[-1]
+                # Continuous path: divide the character's own chapter range into
+                # evenly-sized blocks, sized by their own span (not the whole book),
+                # with no leftover-chapter straggler segment.
                 total_span = last_chapter - first_chapter + 1
-                block_size = max(1, round(total_span / num_segments))
+                num_segments = max(1, min(max_segments, total_span // min_chapters_per_segment))
 
-                seg_num = 1
+                base_size = total_span // num_segments
+                remainder = total_span % num_segments
+
+                segments = []
                 start = first_chapter
-                while start <= last_chapter:
-                    end = min(start + block_size - 1, last_chapter)
+                for i in range(num_segments):
+                    size = base_size + (1 if i < remainder else 0)
+                    end = start + size - 1
                     segments.append({
-                        "segment_number": seg_num,
+                        "segment_number": i + 1,
                         "chapter_start": start,
                         "chapter_end": end
                     })
-                    seg_num += 1
                     start = end + 1
+
             else:
                 # Clustered path: group present-chapters, breaking on gaps > threshold
+                segments = []
                 seg_num = 1
                 current_group = [chapters[0]]
                 for i in range(1, len(chapters)):
@@ -301,7 +308,6 @@ def segment_characters(characters, book_total_chapters, gap_threshold_ratio=0.15
                         current_group = [chapters[i]]
                     else:
                         current_group.append(chapters[i])
-                # flush last group
                 segments.append({
                     "segment_number": seg_num,
                     "chapter_start": current_group[0],
@@ -310,12 +316,15 @@ def segment_characters(characters, book_total_chapters, gap_threshold_ratio=0.15
 
             character["segments"] = segments
 
-        elif character.get("classification") == "static":
-            character["segment_number"] = 1
+        elif classification == "static":
             spans = character.get("spans", [])
             chapter_numbers = [s["chapter_number"] for s in spans]
+            if not chapter_numbers:
+                character["segments"] = []
+                continue
             chapter_start = min(chapter_numbers)
             chapter_end = max(chapter_numbers)
+            character["segment_number"] = 1
             character["segments"] = [{
                 "segment_number": 1,
                 "chapter_start": chapter_start,
