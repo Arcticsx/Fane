@@ -139,7 +139,7 @@ def process_characters(session_id, source_document_id, characters):
         if arc_state is None:
             continue
         try:
-            arc_records.append(persist_arc_records(session_id, arc_state))
+            arc_records.append(persist_arc_records(session_id=session_id, arc_state=arc_state, segment_id=arc_state["segment_id"], character_id=arc_state["character_id"]))
         except Exception as e:
             print(f"[process_characters] Error persisting arc records for character_id {arc_state['character_id']} and segment_id {arc_state['segment_id']} in session {session_id}: {e}", file=sys.stderr)
             continue
