@@ -47,7 +47,48 @@ ENTITIES_SCHEMA = {
 }
 
 
-def get_client(mode):
+CHARACTER_PERSONALITY_SCHEMA = {
+    "character_name": {"type": "string"},
+    "has_sufficient_data": {"type": "boolean"},
+    "summary": {"type": "string"},
+    "traits": {
+        "type": "array",
+        "items": {
+            "type": "object",
+            "properties": {
+                "trait": {"type": "string"},
+                "evidence_pages": {"type": "array", "items": {"type": "integer"}}
+            }
+        }
+    },
+    "contradictions": {"type": "array", "items": {"type": "string"}}  # per your system prompt's "note contradictions" rule
+}
+
+CHARACTER_BACKSTORY_SCHEMA = {
+    "character_name": {"type": "string"},
+    "has_sufficient_data": {"type": "boolean"},
+    "new_revelations": {"type": "string"},  # only what's newly revealed in THIS segment
+    "evidence_pages": {"type": "array", "items": {"type": "integer"}}
+}
+
+CHARACTER_FIGHTING_STYLE_SCHEMA = {
+    "character_name": {"type": "string"},
+    "has_combat_evidence": {"type": "boolean"},  # explicit, not inferred from empty list
+    "summary": {"type": "string"},
+    "traits": {
+        "type": "array",
+        "items": {
+            "type": "object",
+            "properties": {
+                "trait": {"type": "string"},
+                "evidence_pages": {"type": "array", "items": {"type": "integer"}}
+            }
+        }
+    }
+}
+
+
+def get_client(mode, type):
     
     if mode == "chat":
         if PROVIDER == "deepseek":
@@ -134,6 +175,38 @@ def get_client(mode):
                 )
             except Exception as e:
                 print(f"[Warning] ollama client init failed: {e}")
+        
+    elif mode == "characters":
+        if PROVIDER == "deepseek":
+            try:
+                return ChatOpenAI(
+                    model=AISUITE_MODEL,
+                    api_key=API_KEY,
+                    base_url="https://api.deepseek.com",
+                    temperature=0,
+                    format=CHARACTER_PERSONALITY_SCHEMA if type == "personality" else (CHARACTER_BACKSTORY_SCHEMA if type == "backstory" else CHARACTER_FIGHTING_STYLE_SCHEMA),
+                )
+            except Exception as e:
+                print(f"[Warning] deepseek client init failed: {e}")
+                # fall through to stub
+
+        elif PROVIDER == "ollama":
+            try:
+                from langchain_ollama import ChatOllama
+                model_name = AISUITE_MODEL
+                if model_name and ":" in model_name:
+                    model_name = model_name.split(":", 1)[1]
+                return ChatOllama(
+                    model=model_name,
+                    base_url="http://localhost:11434",
+                    temperature=0,
+                    num_ctx=8192,
+                    format=CHARACTER_PERSONALITY_SCHEMA if type == "personality" else (CHARACTER_BACKSTORY_SCHEMA if type == "backstory" else CHARACTER_FIGHTING_STYLE_SCHEMA),
+                )
+            except Exception as e:
+                print(f"[Warning] ollama client init failed: {e}")
+    
+    
 
     # Fallback: when no provider is configured (local development/tests),
     # return a simple deterministic stub client so `/chat` remains usable.
@@ -158,8 +231,8 @@ def get_client(mode):
     return _StubClient()
 
 
-def get_response(prompt, mode, retries=3, backoff=2):
-    client = get_client(mode)
+def get_response(prompt, mode, type, retries=3, backoff=2):
+    client = get_client(mode, type)
     last_error = None
 
     TRANSIENT_KEYWORDS = (

@@ -1,9 +1,81 @@
 import sys
 import json
 import re
+
+from Backend.App.response import get_response
 from ..database import get_db
 from ..models.rpg_sessions import Character, CharacterArcState, CharacterSegment, CharacterSpan, SourceDocument, ChronicleChapter
 from .vectorstore import query_chroma_by_page_range
+from .documents import token_length
+
+PERSONALITY_PROMPT = """Analyze the personality of {character_name} using ONLY the provided non-continuous excerpts. No outside knowledge. Base all claims on text evidence; do not invent traits. Distinguish shown behavior from "(implied)" inferences and flag "(secondhand)" accounts. Do not summarize plot. Use a neutral, descriptive tone. If evidence is thin, set "has_sufficient_data" to false.
+
+Your output MUST be exhaustive and highly detailed. In the "summary" field, provide a comprehensive, multi-paragraph analysis covering temperament, values, speech patterns, fears, sense of humor, and interpersonal dynamics. In the "traits" array, break down the character into granular, highly specific traits rather than broad generalizations. 
+
+Output strictly valid JSON matching this schema:
+{{
+  "character_name": {{"type": "string"}},
+  "has_sufficient_data": {{"type": "boolean"}},
+  "summary": {{"type": "string"}}, 
+  "traits": {{
+    "type": "array",
+    "items": {{
+      "type": "object",
+      "properties": {{
+        "trait": {{"type": "string"}},  // granular trait, include "(implied)" or "(secondhand)" tags
+        "evidence_pages": {{"type": "array", "items": {{"type": "integer"}}}}
+      }}
+    }}
+  }},
+  "contradictions": {{"type": "array", "items": {{"type": "string"}}}}  // detail inconsistent behaviors with page numbers; empty array if none
+}}
+
+Data:
+{data}
+"""
+
+BACKSTORY_PROMPT = """Analyze the backstory of {character_name} (past history, origins, formative events) using ONLY the provided non-continuous excerpts. No outside knowledge. Distinguish stated facts from "(implied)" inferences and flag claims as "(secondhand - per [source])". Ignore present-tense plot; focus only on the past. If evidence is thin, set "has_sufficient_data" to false.
+
+Your output MUST be exhaustive and highly detailed. In the "new_revelations" field, provide a comprehensive, deep-dive analysis of origins, family history, past relationships, prior roles, and formative experiences. Organize roughly chronologically if possible, otherwise by theme. Do not pad with speculation, but extract every available nuance and contextual detail from the text.
+
+Output strictly valid JSON matching this schema:
+{{
+  "character_name": {{"type": "string"}},
+  "has_sufficient_data": {{"type": "boolean"}},
+  "new_revelations": {{"type": "string"}},  // highly detailed, exhaustive breakdown of past history
+  "evidence_pages": {{"type": "array", "items": {{"type": "integer"}}}}
+}}
+
+Data:
+{data}
+"""
+
+FIGHTING_STYLE_PROMPT = """Analyze the fighting style of {character_name} using ONLY the provided excerpts depicting physical conflict. No outside knowledge. Do not infer combat ability from non-combat excerpts. Distinguish demonstrated actions from "(stated)" claims and "(implied)" inferences; flag "(secondhand)" accounts. Do not summarize plot outcomes. If there is no combat evidence, set "has_combat_evidence" to false.
+
+Your output MUST be exhaustive and highly detailed. In the "summary", provide a comprehensive multi-paragraph breakdown of weapons/tools, physical techniques, tactical approach (aggressive vs defensive, opportunistic vs disciplined), improvisation vs formal training, and composure under pressure. In the "traits" array, extract granular, highly specific combat habits and mechanical behaviors rather than broad descriptions.
+
+Output strictly valid JSON matching this schema:
+{{
+  "character_name": {{"type": "string"}},
+  "has_combat_evidence": {{"type": "boolean"}},
+  "summary": {{"type": "string"}},  // exhaustive, highly detailed tactical and mechanical analysis
+  "traits": {{
+    "type": "array",
+    "items": {{
+      "type": "object",
+      "properties": {{
+        "trait": {{"type": "string"}},  // granular combat habit, include "(stated)", "(implied)", or "(secondhand)" tags
+        "evidence_pages": {{"type": "array", "items": {{"type": "integer"}}}}
+      }}
+    }}
+  }}
+}}
+
+Data:
+{data}
+"""
+
+
 
 def process_characters(session_id, source_document_id, characters):
     
@@ -35,11 +107,9 @@ def process_characters(session_id, source_document_id, characters):
         else:
             print(f"[process_characters] Failed to persist character spans in database for session {session_id}", file=sys.stderr)
 
-    print(f"[process_characters] Spans with chapter numbers:\n{format_with_inline_pages(spanned_characters)}", file=sys.stderr)
     
     segmented_characters = segment_characters(spanned_characters, book_total_chapters=len(db.query(ChronicleChapter).filter(ChronicleChapter.session_id == session_id).all()))
     
-    print(f"[process_characters] Segmented characters:\n{format_with_inline_pages(segmented_characters)}", file=sys.stderr)
     
     for character in segmented_characters:
         if persist_character_segments(session_id, character):
@@ -47,7 +117,7 @@ def process_characters(session_id, source_document_id, characters):
         else:
             print(f"[process_characters] Failed to persist character segments in database for session {session_id}", file=sys.stderr)
     
-    
+    arc_states = []
     characters = db.query(Character).filter(Character.session_id == session_id).all()
     for character in characters:
        
@@ -58,13 +128,21 @@ def process_characters(session_id, source_document_id, characters):
                 CharacterArcState.segment_id == segment.id
             ).first()
             if not arc_state:
-                process_arc_records(session_id, segment.id)
+                arc_states.append(process_arc_records(session_id, segment.id))
                 print(f"[process_characters] Processed arc records for character {character.name} and segment {segment.segment_number} in session {session_id}", file=sys.stderr)
             else:
                 print(f"[process_characters] Arc record already exists for character {character.name} and segment {segment.segment_number} in session {session_id}, skipping.", file=sys.stderr)
     
+    for arc_state in arc_states:
+        if arc_state is None:
+            continue
+        if persist_arc_records(session_id, arc_state, character_id=arc_state["character_id"], segment_id=arc_state["segment_id"]):
+            print(f"[process_characters] Persisted arc records in database for session {session_id}", file=sys.stderr)
+        else:
+            print(f"[process_characters] Failed to persist arc records in database for session {session_id}", file=sys.stderr)
     
     
+
 def rank_characters(characters):
     return sorted(characters, key=lambda c: (c.get("total_pages", 0), len(c.get("spans", []))), reverse=True)
 
@@ -450,8 +528,40 @@ def process_arc_records(session_id, segment_id):
             "backstory_pool": backstory_pool,
             "fighting_style_pool": fighting_style_pool,
         }
-            
-            
+ 
+def dedupe_overlap(chunk_a_text, chunk_b_text, min_overlap=20):
+    """If chunk_b starts with the tail of chunk_a, strip the duplicated prefix from chunk_b."""
+    max_check = min(len(chunk_a_text), len(chunk_b_text), 300)
+    for overlap_len in range(max_check, min_overlap, -1):
+        if chunk_a_text[-overlap_len:] == chunk_b_text[:overlap_len]:
+            return chunk_b_text[overlap_len:]
+    return chunk_b_text
+
+def order_pool(pool):
+    return sorted(pool, key=lambda c: (c["page"], c.get("start_index", 0)))
+
+
+def strip_markdown_noise(text):
+    text = re.sub(r'^#{1,3}\s*.*$', '', text, flags=re.MULTILINE)  # drop header lines
+    text = re.sub(r'\n{3,}', '\n\n', text)  # collapse excess blank lines
+    return text.strip()
+
+def trim_pool_to_budget(pool, token_budget):
+    while pool and sum(token_length(c["text"]) for c in pool) > token_budget:
+        pool.pop(0)
+    return pool
+           
+def prepare_pool_for_synthesis(pool, token_budget):
+    ordered = order_pool(pool)
+    cleaned = [strip_markdown_noise(c["text"]) for c in ordered]
+
+    # dedupe adjacent overlaps
+    for i in range(1, len(cleaned)):
+        cleaned[i] = dedupe_overlap(cleaned[i-1], cleaned[i])
+
+    combined_chunks = [{"text": t, **{k: v for k, v in ordered[i].items() if k != "text"}} for i, t in enumerate(cleaned)]
+    return trim_pool_to_budget(combined_chunks, token_budget)
+               
             
 
 def rank_personality_chunks(chunk):
@@ -527,24 +637,44 @@ def select_top_per_bin(bins, score_key, min_score=0.0):
             pool.append(best["chunk"])
     return pool   
             
-            
+          
 
 
-def persist_arc_records(session_id):
+def persist_arc_records(session_id, arc_state, character_id, segment_id):
+    if not arc_state:
+        print(f"[persist_arc_records] No arc state found for character_id {character_id} and segment_id {segment_id} in session {session_id}, skipping arc record insertion.", file=sys.stderr)
+        return False
     with get_db() as db:
-        characters = db.query(Character).filter(Character.session_id == session_id).all()
-        if db.query(CharacterArcState).filter(CharacterArcState.character_id.in_([c.id for c in characters])).first() is not None:
-            print(f"[persist_arc_records] Arc records already exist for session {session_id}, skipping insertion.", file=sys.stderr)
-            return False
-        for character in characters:
-            if character.classification == "arc-based":
-                segments = db.query(CharacterSegment).filter(CharacterSegment.character_id == character.id).all()
-                for segment in segments:
-                    
-                    db.add(CharacterArcState(
-                        character_id=character.id,
-                        character_name=character.name,
-                        segment_id= segment.id,
-                        segment_number=segment.segment_number,
-                    ))
+        existing_arc_state = db.query(CharacterArcState).filter(
+            CharacterArcState.character_id == arc_state["character_id"],
+            CharacterArcState.segment_id == arc_state["segment_id"]
+        ).first()
+        if existing_arc_state:
+            return False  # Arc state already exists, skip insertion
+        personality_chunks = prepare_pool_for_synthesis(arc_state["personality_pool"], token_budget=4000)
+        backstory_chunks = prepare_pool_for_synthesis(arc_state["backstory_pool"], token_budget=4000)
+        fighting_style_chunks = prepare_pool_for_synthesis(arc_state["fighting_style_pool"], token_budget=4000)
+        print(f"[persist_arc_records] Extracting personality for character_id {arc_state['character_id']} and segment_id {arc_state['segment_id']} in session {session_id}", file=sys.stderr)
+        personality = get_response(PERSONALITY_PROMPT.format(character_name=arc_state["character_id"], data=personality_chunks), mode="characters", type="personality")
+        print(personality)
+        print(f"[persist_arc_records] Extracting backstory for character_id {arc_state['character_id']} and segment_id {arc_state['segment_id']} in session {session_id}", file=sys.stderr)
+        backstory = get_response(BACKSTORY_PROMPT.format(character_name=arc_state["character_id"], data=backstory_chunks), mode="characters", type="backstory")
+        print(backstory)
+        print(f"[persist_arc_records] Extracting fighting style for character_id {arc_state['character_id']} and segment_id {arc_state['segment_id']} in session {session_id}", file=sys.stderr)
+        fighting_style = get_response(FIGHTING_STYLE_PROMPT.format(character_name=arc_state["character_id"], data=fighting_style_chunks), mode="characters", type="fighting_style")
+        print(fighting_style)
+        arc_state_record = CharacterArcState(
+            character_id=arc_state["character_id"],
+            segment_id=arc_state["segment_id"],
+            character_name=db.query(Character).filter(Character.id == arc_state["character_id"]).first().name,
+            segment_number = db.query(CharacterSegment).filter(CharacterSegment.id == arc_state["segment_id"]).first().segment_number,
+            personality_md=personality,
+            backstory_delta_md=backstory,
+            fighting_style_md=fighting_style
+        )
+        print(f"[persist_arc_records] About to INSERT character_id={arc_state['character_id']} "
+            f"segment_id={arc_state['segment_id']}", file=sys.stderr)
+        db.add(arc_state_record)
         db.commit()
+        print(f"[persist_arc_records] COMMITTED id={arc_state_record.id}", file=sys.stderr)
+        return True
