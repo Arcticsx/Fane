@@ -70,6 +70,18 @@ class RpgSession(Base):
 
     def __repr__(self) -> str:
         return f"<RpgSession id={self.id!r} title={self.title!r}>"
+    
+class ProcessStatus(Base):
+    __tablename__ = "process_status"
+    
+    id = Column(String, primary_key=True, default=_uuid)
+    session_id = Column(String, ForeignKey("rpg_sessions.id", ondelete="CASCADE"), nullable=False)
+    phase = Column(String, nullable=False)  # e.g., "
+    status = Column(String, nullable=False)  # e.g., "pending", "in_progress", "completed", "failed"
+    started_at = Column(DateTime(timezone=True), nullable=True)
+    completed_at = Column(DateTime(timezone=True), nullable=True)
+    
+    session = relationship("RpgSession", back_populates="process_statuses")
 
 class SourceDocument(Base):
     __tablename__ = "source_document"

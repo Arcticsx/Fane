@@ -1,13 +1,70 @@
 import re
+import shutil
 import sys
+import uuid
+from zipfile import Path
+from fastapi import UploadFile
+from fastapi import UploadFile
+from sqlalchemy.orm import Session
 import pymupdf4llm
 from langchain_text_splitters import RecursiveCharacterTextSplitter, MarkdownHeaderTextSplitter
 from langchain_core.documents import Document
 from sentence_transformers import SentenceTransformer
 import pymupdf
 import os
-
+from Backend.App.models.rpg_sessions import ProcessStatus, RpgSession, SourceDocument
+from ..utility.config import DATA_DIR
 from ..utility.config import EMBEDDING_MODEL
+from ..utility.status import initialize_status, update_status
+
+
+UPLOAD_DIR = Path(DATA_DIR) / "files"
+ALLOWED_EXTENSIONS = {".pdf"}
+
+def create_source_document(db: Session, session_id: str, file: UploadFile) -> SourceDocument:
+    ext = os.path.splitext(file.filename)[1].lower()
+    if ext not in ALLOWED_EXTENSIONS:
+        raise ValueError(f"Unsupported file type: {ext}")
+
+    initialize_status(db=db, session_id=session_id)
+
+    UPLOAD_DIR.mkdir(parents=True, exist_ok=True)
+    safe_name = f"{session_id[:8]}_{uuid.uuid4().hex}_{Path(file.filename or 'upload.pdf').name}"
+    file_path = UPLOAD_DIR / safe_name
+
+    source_doc = SourceDocument(
+        session_id=session_id,
+        filename=file.filename,
+        status="processing",
+        chunk_count=0,
+        file_path=str(file_path),
+    )
+    db.add(source_doc)
+
+    try:
+        db.commit()
+    except Exception:
+        db.rollback()
+        raise
+
+    db.refresh(source_doc)
+    update_status(db=db, session_id=session_id, phase="document_upload", status="processing")
+
+    try:
+        with open(file_path, "wb") as f:
+            shutil.copyfileobj(file.file, f)
+    except Exception as e:
+        source_doc.status = "failed"
+        db.commit()
+        update_status(
+            db=db, session_id=session_id, phase="document_upload",
+            status="failed", error=f"Failed to save uploaded file: {e}"
+        )
+        file_path.unlink(missing_ok=True)  # clean up partial file
+        raise
+
+    update_status(db=db, session_id=session_id, phase="document_upload", status="completed")
+    return source_doc
 
 
 def normalize_text(text):

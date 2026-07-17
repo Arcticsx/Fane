@@ -57,7 +57,8 @@ def process_story_beats(
                 #             )
                 #     finally:
                 #         time.sleep(3)
-                candidate_beats = extract_candidate_beats()
+                
+                candidate_beats = extract_candidate_beats() # THIS IS A PLACEHOLDER FOR TESTING, REPLACE WITH THE ABOVE LOOP WHEN READY
                 if not candidate_beats:
                     raise ValueError("No beats extracted")
                 else:
