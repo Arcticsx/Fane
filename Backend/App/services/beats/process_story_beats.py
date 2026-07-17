@@ -32,33 +32,33 @@ def process_story_beats(
                 candidate_beats = []
                 consecutive_failures = 0
 
-                # for start_page, end_page in windows:
-                #     try:
-                #         beats = extract_beats_from_window(session_id, source_document_id, start_page, end_page)
-                #         candidate_beats.extend(beats)
-                #         consecutive_failures = 0
-                #     except Exception as e:
-                #         consecutive_failures += 1
-                #         print(
-                #             f"[process_story_beats] Error extracting pages {start_page}-{end_page} "
-                #             f"for {source_document_id}: {e}",
-                #             file=sys.stderr,
-                #         )
-                #         if "connection refused" in str(e).lower() or "server disconnected" in str(e).lower():
-                #             print(f"[process_story_beats] Ollama appears unresponsive, backing off 15s", file=sys.stderr)
-                #             time.sleep(15)
-                #             beats = extract_beats_from_window(session_id, source_document_id, start_page, end_page)
-                #             candidate_beats.extend(beats)
-                #             consecutive_failures = 0
-                #         if consecutive_failures >= 5:
-                #             raise RuntimeError(
-                #                 f"Too many consecutive extraction failures ({consecutive_failures}); "
-                #                 f"aborting rather than continuing to degrade"
-                #             )
-                #     finally:
-                #         time.sleep(3)
+                for start_page, end_page in windows:
+                    try:
+                        beats = extract_beats_from_window(session_id, source_document_id, start_page, end_page)
+                        candidate_beats.extend(beats)
+                        consecutive_failures = 0
+                    except Exception as e:
+                        consecutive_failures += 1
+                        print(
+                            f"[process_story_beats] Error extracting pages {start_page}-{end_page} "
+                            f"for {source_document_id}: {e}",
+                            file=sys.stderr,
+                        )
+                        if "connection refused" in str(e).lower() or "server disconnected" in str(e).lower():
+                            print(f"[process_story_beats] Ollama appears unresponsive, backing off 15s", file=sys.stderr)
+                            time.sleep(15)
+                            beats = extract_beats_from_window(session_id, source_document_id, start_page, end_page)
+                            candidate_beats.extend(beats)
+                            consecutive_failures = 0
+                        if consecutive_failures >= 5:
+                            raise RuntimeError(
+                                f"Too many consecutive extraction failures ({consecutive_failures}); "
+                                f"aborting rather than continuing to degrade"
+                            )
+                    finally:
+                        time.sleep(3)
                 
-                candidate_beats = extract_candidate_beats() # THIS IS A PLACEHOLDER FOR TESTING, REPLACE WITH THE ABOVE LOOP WHEN READY
+                # candidate_beats = extract_candidate_beats() # THIS IS A PLACEHOLDER FOR TESTING, REPLACE WITH THE ABOVE LOOP WHEN READY
                 if not candidate_beats:
                     raise ValueError("No beats extracted")
                 else:

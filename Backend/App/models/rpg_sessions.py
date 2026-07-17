@@ -9,10 +9,11 @@ from sqlalchemy import (
     ForeignKey,
     Boolean,
     JSON,
+    UniqueConstraint,
 )
 from sqlalchemy.orm import relationship
 from .dbbase import Base
-from .document_status import default_status
+
 
 def _uuid() -> str:
     return str(uuid.uuid4())
@@ -67,21 +68,51 @@ class RpgSession(Base):
     graph_edges = relationship(
         "GraphEdge", back_populates="session", cascade="all, delete-orphan"
     )
+    process_statuses = relationship(
+        "ProcessStatus", back_populates="session", cascade="all, delete-orphan"
+    )
 
     def __repr__(self) -> str:
         return f"<RpgSession id={self.id!r} title={self.title!r}>"
     
 class ProcessStatus(Base):
     __tablename__ = "process_status"
-    
+
     id = Column(String, primary_key=True, default=_uuid)
     session_id = Column(String, ForeignKey("rpg_sessions.id", ondelete="CASCADE"), nullable=False)
-    phase = Column(String, nullable=False)  # e.g., "
-    status = Column(String, nullable=False)  # e.g., "pending", "in_progress", "completed", "failed"
+    phase = Column(String, nullable=False)  # e.g., "document_upload", "chunking", "embedding"
+    status = Column(String, nullable=False, default="pending")  # pending, processing, completed, failed
+    error = Column(String, nullable=True)
     started_at = Column(DateTime(timezone=True), nullable=True)
     completed_at = Column(DateTime(timezone=True), nullable=True)
-    
+
     session = relationship("RpgSession", back_populates="process_statuses")
+    steps = relationship("ProcessStep", back_populates="process_status", cascade="all, delete-orphan")
+
+    __table_args__ = (
+        UniqueConstraint("session_id", "phase", name="uq_session_phase"),
+    )
+
+
+class ProcessStep(Base):
+    __tablename__ = "process_steps"
+
+    id = Column(String, primary_key=True, default=_uuid)
+    session_id = Column(String, ForeignKey("rpg_sessions.id", ondelete="CASCADE"), nullable=False)
+    phase = Column(String, nullable=False)
+    step = Column(String, nullable=False)
+    order = Column(Integer, nullable=False, default=0)
+    status = Column(String, nullable=False, default="pending")
+    error = Column(String, nullable=True)
+    started_at = Column(DateTime(timezone=True), nullable=True)
+    completed_at = Column(DateTime(timezone=True), nullable=True)
+
+    process_status_id = Column(String, ForeignKey("process_status.id", ondelete="CASCADE"), nullable=True)
+    process_status = relationship("ProcessStatus", back_populates="steps")
+
+    __table_args__ = (
+        UniqueConstraint("session_id", "phase", "step", name="uq_session_phase_step"),
+    )
 
 class SourceDocument(Base):
     __tablename__ = "source_document"
@@ -89,7 +120,7 @@ class SourceDocument(Base):
     id = Column(String, primary_key=True, default=_uuid)
     session_id = Column(String, ForeignKey("rpg_sessions.id", ondelete="CASCADE"), nullable=False)
     filename = Column(String, nullable=False)
-    status = Column(JSON, nullable=False, default=default_status)
+    status = Column(String, nullable=False, default="pending")
     chunk_count = Column(Integer, default=0)
     uploaded_at = Column(DateTime(timezone=True), default=_now, nullable=False)
     processing_started_at = Column(DateTime(timezone=True), nullable=True)
