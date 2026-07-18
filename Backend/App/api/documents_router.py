@@ -1,4 +1,5 @@
 import os
+from datetime import datetime, timezone
 from pathlib import Path
 from ..services.documents.documents import create_source_document
 from fastapi import APIRouter, BackgroundTasks, Depends, File, HTTPException, UploadFile, logger
@@ -58,6 +59,18 @@ async def get_document_status(
     ).first()
     if not doc:
         raise HTTPException(status_code=404, detail="Document not found")
+
+    if doc.status == "processing":
+        heartbeat_deadline = (
+            doc.last_heartbeat.timestamp() + 300
+            if doc.last_heartbeat else 0
+        )
+        if datetime.now(timezone.utc).timestamp() > heartbeat_deadline:
+            doc.status = "failed"
+            doc.error_message = "Server crashed"
+            doc.processing_completed_at = datetime.now(timezone.utc)
+            db.commit()
+
     return {
         "source_document_id": doc.id,
         "status": doc.status,

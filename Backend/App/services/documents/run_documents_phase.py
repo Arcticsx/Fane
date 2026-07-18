@@ -1,5 +1,6 @@
 import sys
 import json
+from datetime import datetime, timezone
 
 from ..utility.getdb import get_db
 from ..utility.status import is_step_completed, start_step, complete_step, fail_step
@@ -134,6 +135,7 @@ def _step_chunking(source_doc_id: str, session_id: str, temp_path: str):
             if source_doc:
                 source_doc.chunk_count = len(chunks)
                 source_doc.status = "processing"
+                source_doc.last_heartbeat = datetime.now(timezone.utc)
                 db.commit()
             print(f"[run_documents] Chunked into {len(chunks)} chunks")
 

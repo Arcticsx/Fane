@@ -126,6 +126,7 @@ class SourceDocument(Base):
     processing_started_at = Column(DateTime(timezone=True), nullable=True)
     processing_completed_at = Column(DateTime(timezone=True), nullable=True)
     error_message = Column(Text, nullable=True)
+    last_heartbeat = Column(DateTime(timezone=True), nullable=True)
     file_size_bytes = Column(Integer, nullable=True)
     total_pages = Column(Integer, nullable=True)
     file_path = Column(String, nullable=True)
