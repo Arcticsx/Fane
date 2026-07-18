@@ -33,8 +33,7 @@ PHASE_STEPS = {
         ("characters_classify",    800),
         ("characters_persist",     801),
         ("characters_segment",     802),
-        ("characters_arc_llm",     803),
-        ("characters_arc_persist", 804),
+        ("characters_arc",     803),
     ],
 }
 

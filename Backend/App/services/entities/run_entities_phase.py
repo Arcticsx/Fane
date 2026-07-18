@@ -46,8 +46,6 @@ def run_entities_phase(source_doc_id: str, session_id: str):
 
     _step_characters_arc_llm(source_doc_id, session_id)
 
-    _step_characters_arc_persist(source_doc_id, session_id)
-
 
 def _get_source_doc(source_doc_id: str):
     with get_db() as db:
@@ -115,21 +113,13 @@ def _step_entities_extract(source_doc_id: str, session_id: str):
                 candidate_entities.append(entities)
                 consecutive_failures = 0
             except Exception as e:
-                consecutive_failures += 1
-                print(f"[run_entities] Error extracting pages {start_page}-{end_page}: {e}", file=sys.stderr)
-                if "connection refused" in str(e).lower() or "server disconnected" in str(e).lower():
-                    print(f"[run_entities] Ollama unresponsive, backing off 15s", file=sys.stderr)
-                    time.sleep(15)
-                    try:
-                        entities = extract_entities_from_window(session_id, start_page, end_page)
-                        candidate_entities.append(entities)
-                        consecutive_failures = 0
-                    except Exception as retry_e:
-                        print(f"[run_entities] Retry also failed: {retry_e}", file=sys.stderr)
-                if consecutive_failures >= 5:
-                    raise RuntimeError(
-                        f"Too many consecutive extraction failures ({consecutive_failures}); aborting"
-                    )
+                        consecutive_failures += 1
+                        print(f"[run_entities] Error extracting pages {start_page}-{end_page}: {e}", file=sys.stderr)
+
+                        if consecutive_failures >= 5:
+                            raise RuntimeError(
+                                f"Too many consecutive extraction failures ({consecutive_failures}); aborting"
+                            )
             finally:
                 time.sleep(3)
 
@@ -357,7 +347,7 @@ def _step_characters_segment(source_doc_id: str, session_id: str, spanned_charac
 
 def _step_characters_arc_llm(source_doc_id: str, session_id: str):
     phase = "character_processing"
-    step = "characters_arc_llm"
+    step = "characters_arc"
 
     with get_db() as db:
         if is_step_completed(db, session_id, phase, step):
@@ -382,53 +372,6 @@ def _step_characters_arc_llm(source_doc_id: str, session_id: str):
         print(f"[run_entities] Error running arc LLM for {source_doc_id}: {e}", file=sys.stderr)
         raise
 
-
-def _step_characters_arc_persist(source_doc_id: str, session_id: str):
-    phase = "character_processing"
-    step = "characters_arc_persist"
-
-    with get_db() as db:
-        if is_step_completed(db, session_id, phase, step):
-            return
-
-    with get_db() as db:
-        try:
-            start_step(db, session_id, phase, step)
-        except Exception:
-            pass
-
-    try:
-        with get_db() as db:
-            characters = db.query(Character).filter(Character.session_id == session_id).all()
-            total_expected = 0
-            total_existing = 0
-            for character in characters:
-                segments = db.query(CharacterSegment).filter(
-                    CharacterSegment.character_id == character.id
-                ).all()
-                for segment in segments:
-                    total_expected += 1
-                    existing = db.query(CharacterArcState).filter(
-                        CharacterArcState.character_id == character.id,
-                        CharacterArcState.segment_id == segment.id,
-                    ).first()
-                    if existing:
-                        total_existing += 1
-
-            missing = total_expected - total_existing
-            if missing > 0:
-                print(f"[run_entities] {missing} missing arc states — re-running LLM for gaps", file=sys.stderr)
-                _run_arc_llm_for_session(session_id)
-
-        with get_db() as db:
-            complete_step(db, session_id, phase, step)
-
-    except Exception as e:
-        with get_db() as db:
-            fail_step(db, session_id, phase, step, e)
-            _mark_source_failed(db, source_doc_id, e)
-        print(f"[run_entities] Error persisting arc records for {source_doc_id}: {e}", file=sys.stderr)
-        raise
 
 
 def _run_arc_llm_for_session(session_id: str):

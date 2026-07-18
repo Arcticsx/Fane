@@ -1,6 +1,6 @@
 import sys
 import json
-
+import time
 from ..utility.getdb import get_db
 from ..utility.status import is_step_completed, start_step, complete_step, fail_step
 from ...models.rpg_sessions import SourceDocument, StoryBeat
@@ -50,7 +50,7 @@ def _step_beats_extract(source_doc_id: str, session_id: str):
         all_beats = []
         consecutive_failures = 0
 
-        import time
+        
         for start_page, end_page in windows:
             beats = None
             
