@@ -2,7 +2,7 @@ from contextlib import contextmanager
 from sqlalchemy import create_engine, inspect, text
 from sqlalchemy.orm import sessionmaker
 
-from Backend.App.models.dbbase import Base
+from ...models.dbbase import Base
 
 from .config import DATA_DIR
 

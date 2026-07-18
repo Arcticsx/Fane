@@ -90,7 +90,7 @@ def test_chronicle_chat_includes_relevant_pdf_context(monkeypatch):
         captured["prompt"] = prompt
         return "ok"
 
-    monkeypatch.setattr("app.api.chronicle_router.get_response", fake_get_response)
+    monkeypatch.setattr("app.api.chronicle_router.get_response", lambda prompt, mode="chat", type="default": fake_get_response(prompt))
     monkeypatch.setattr(
         "app.api.chronicle_router.query_chroma_for_lore",
         lambda session_id, query_text, n_results=5, category=None: [
@@ -118,7 +118,7 @@ def test_chronicle_chat_creates_story_beat_and_event(monkeypatch):
     )
     session_id = created.json()["id"]
 
-    monkeypatch.setattr("app.api.chronicle_router.get_response", lambda prompt: "The hero opens the ancient gate.")
+    monkeypatch.setattr("app.api.chronicle_router.get_response", lambda prompt, mode="chat", type="default": "The hero opens the ancient gate.")
     monkeypatch.setattr("app.api.chronicle_router.query_chroma_for_lore", lambda **kwargs: [])
 
     response = client.post(

@@ -85,9 +85,9 @@ function ChronicleCreator() {
 
       // 3. Start polling status
       pollStatus(sid, did);
-      // navigate to chronicle detail/chat after creation
+      // Return to the chronicle home page after creation instead of jumping straight into chat
       if (sid) {
-        navigate(`/chronicle/${encodeURIComponent(sid)}`);
+        navigate('/chronicle/discover');
       }
     } catch (err) {
       console.error('Creation error:', err);

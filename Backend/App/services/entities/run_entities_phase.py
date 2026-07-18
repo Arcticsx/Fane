@@ -22,7 +22,7 @@ from .process_characters import (
     BACKSTORY_PROMPT,
     FIGHTING_STYLE_PROMPT,
 )
-from Backend.App.services.utility.utility_functions import estimate_tokens
+from ..utility.utility_functions import estimate_tokens
 
 
 def run_entities_phase(source_doc_id: str, session_id: str):

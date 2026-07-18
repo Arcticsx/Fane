@@ -7,6 +7,7 @@ import time
 import sys
 from ..utility.getdb import get_db
 from ...models.rpg_sessions import StoryBeat
+from sqlalchemy.orm import Session
 from typing import List, Dict, Any, Set
 from difflib import get_close_matches
 from ..utility.config import _dbg

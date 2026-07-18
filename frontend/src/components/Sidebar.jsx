@@ -4,29 +4,53 @@ import { api, getImageUrl } from '../api';
 
 function Sidebar({ activeView, onViewChange, onCreateClick }) {
   const [width, setWidth] = useState(224);
-  const [recentSessions, setRecentSessions] = useState([]);
+  const [recentItems, setRecentItems] = useState([]);
   const [loading, setLoading] = useState(true);
 
   const navigate = useNavigate();
   const location = useLocation();
-  const { sessionId: activeSessionId } = useParams();
+  const { sessionId: activeSessionId, chronicleId: activeChronicleId } = useParams();
+  const isChronicleRoute = location.pathname.startsWith('/chronicle');
 
   useEffect(() => {
-    const fetchSessions = () => {
+    let cancelled = false;
+
+    const fetchItems = async () => {
       setLoading(true);
 
-      api.getRecentSessions()
-        .then((data) => setRecentSessions(data.sessions || []))
-        .catch(console.error)
-        .finally(() => setLoading(false));
+      try {
+        if (isChronicleRoute) {
+          const chronicles = await api.getRecentChronicles();
+          if (!cancelled) {
+            setRecentItems((chronicles || []).slice(0, 6));
+          }
+        } else {
+          const data = await api.getRecentSessions();
+          if (!cancelled) {
+            setRecentItems((data.sessions || []).slice(0, 6));
+          }
+        }
+      } catch (err) {
+        console.error('Failed to load recent items', err);
+        if (!cancelled) {
+          setRecentItems([]);
+        }
+      } finally {
+        if (!cancelled) {
+          setLoading(false);
+        }
+      }
     };
 
-    fetchSessions();
+    fetchItems();
 
-    const interval = setInterval(fetchSessions, 30000);
+    const interval = setInterval(fetchItems, 30000);
 
-    return () => clearInterval(interval);
-  }, []);
+    return () => {
+      cancelled = true;
+      clearInterval(interval);
+    };
+  }, [isChronicleRoute]);
 
   const formatDate = (dateStr) => {
     const date = new Date(dateStr);
@@ -212,42 +236,78 @@ function Sidebar({ activeView, onViewChange, onCreateClick }) {
         })}
       </nav>
 
-      {/* Recent Sessions */}
+      {/* Recent Items */}
       <div className="mt-6 flex flex-col gap-1 px-3 overflow-y-auto flex-1">
         <p className="px-3 py-1 text-xs font-semibold uppercase tracking-widest text-muted/60">
-          Recent
+          {isChronicleRoute ? 'Recent Chronicles' : 'Recent'}
         </p>
 
         {loading ? (
           <p className="px-3 text-xs text-muted/50">
             Loading...
           </p>
-        ) : recentSessions.length === 0 ? (
+        ) : recentItems.length === 0 ? (
           <p className="px-3 text-xs text-muted/50">
-            No recent sessions.
+            {isChronicleRoute ? 'No recent chronicles.' : 'No recent sessions.'}
           </p>
         ) : (
-          recentSessions.map((session) => {
-            const isActive =
-              activeSessionId ===
-              String(session.id);
+          recentItems.map((item) => {
+            const isActive = isChronicleRoute
+              ? activeChronicleId === String(item.id)
+              : activeSessionId === String(item.id);
+
+            if (isChronicleRoute) {
+              return (
+                <button
+                  key={item.id}
+                  onClick={() => navigate(`/chronicle/${encodeURIComponent(item.id)}`)}
+                  className={`relative flex items-center gap-2.5 rounded-xl px-3 py-2.5 text-left transition-all duration-200 ${
+                    isActive
+                      ? 'bg-accent/10 shadow-[inset_0_1px_0_rgba(255,255,255,0.1)]'
+                      : 'hover:bg-surface/80'
+                  }`}
+                >
+                  {isActive && (
+                    <div className="absolute left-0 top-1/2 -translate-y-1/2 h-6 w-0.5 bg-accent rounded-r-full shadow-[0_0_10px_rgba(99,102,241,0.5)]" />
+                  )}
+
+                  <div className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-gradient-to-br from-accent2 to-accent text-sm font-semibold text-text">
+                    {(item.title || 'C').charAt(0).toUpperCase()}
+                  </div>
+
+                  <div className="flex min-w-0 flex-1 flex-col gap-0.5">
+                    <div className="flex items-center justify-between gap-2">
+                      <span className="truncate text-sm font-medium text-text">
+                        {item.title || 'Untitled Chronicle'}
+                      </span>
+
+                      <span className="shrink-0 text-xs text-muted/50">
+                        {formatDate(item.created_at || item.updated_at)}
+                      </span>
+                    </div>
+
+                    <span className="truncate text-xs text-muted/60">
+                      {item.synopsis || item.setup_status || 'No description yet'}
+                    </span>
+                  </div>
+                </button>
+              );
+            }
 
             return (
               <button
-                key={session.id}
+                key={item.id}
                 onClick={() =>
                   navigate(
-                    `/chat/${session.persona_key}/${session.id}`,
+                    `/chat/${item.persona_key}/${item.id}`,
                     {
                       state: {
                         persona: {
-                          key: session.persona_key,
-                          name:
-                            session.persona_name,
-                          avatar:
-                            session.persona_avatar,
+                          key: item.persona_key,
+                          name: item.persona_name,
+                          avatar: item.persona_avatar,
                         },
-                        session,
+                        session: item,
                       },
                     }
                   )
@@ -263,15 +323,15 @@ function Sidebar({ activeView, onViewChange, onCreateClick }) {
                 )}
 
                 <div className="h-8 w-8 shrink-0 overflow-hidden rounded-full bg-gradient-to-br from-accent2 to-accent">
-                  {session.persona_avatar ? (
+                  {item.persona_avatar ? (
                     <img
-                      src={getImageUrl(session.persona_avatar)}
-                      alt={session.persona_name}
+                      src={getImageUrl(item.persona_avatar)}
+                      alt={item.persona_name}
                       className="h-full w-full object-cover"
                     />
                   ) : (
                     <div className="flex h-full w-full items-center justify-center text-sm font-semibold text-text">
-                      {session.persona_name?.charAt(0)}
+                      {item.persona_name?.charAt(0)}
                     </div>
                   )}
                 </div>
@@ -279,19 +339,16 @@ function Sidebar({ activeView, onViewChange, onCreateClick }) {
                 <div className="flex min-w-0 flex-1 flex-col gap-0.5">
                   <div className="flex items-center justify-between gap-2">
                     <span className="truncate text-sm font-medium text-text">
-                      {session.persona_name}
+                      {item.persona_name}
                     </span>
 
                     <span className="shrink-0 text-xs text-muted/50">
-                      {formatDate(
-                        session.updated_at
-                      )}
+                      {formatDate(item.updated_at)}
                     </span>
                   </div>
 
                   <span className="truncate text-xs text-muted/60">
-                    {session.last_user_message ??
-                      'No messages yet'}
+                    {item.last_user_message ?? 'No messages yet'}
                   </span>
                 </div>
               </button>

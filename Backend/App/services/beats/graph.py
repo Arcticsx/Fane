@@ -1,9 +1,9 @@
 from bisect import bisect_left, bisect_right
 from dataclasses import dataclass
 import sys
-from narwhals import List
-from pyparsing import Dict
 import sqlalchemy
+from sqlalchemy.orm import Session
+from typing import List, Dict
 
 from ...models.rpg_sessions import GraphEdge, StoryBeat
 

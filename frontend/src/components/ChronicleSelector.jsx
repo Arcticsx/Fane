@@ -10,6 +10,9 @@ export default function ChronicleSelector() {
   const [showSearchMenu, setShowSearchMenu] = useState(false);
   const searchRef = useRef(null);
   const [editingChronicle, setEditingChronicle] = useState(null);
+  const [selectedChronicle, setSelectedChronicle] = useState(null);
+  const [processStatus, setProcessStatus] = useState(null);
+  const [processLoading, setProcessLoading] = useState(false);
   const [editForm, setEditForm] = useState({ title: '', description: '', synopsis: '' });
   const [editSaving, setEditSaving] = useState(false);
   const navigate = useNavigate();
@@ -37,11 +40,15 @@ export default function ChronicleSelector() {
         setEditingChronicle(null);
         setEditForm({ title: '', description: '', synopsis: '' });
       }
+      if (selectedChronicle) {
+        setSelectedChronicle(null);
+        setProcessStatus(null);
+      }
     };
 
     window.addEventListener('keydown', handleKeyDown);
     return () => window.removeEventListener('keydown', handleKeyDown);
-  }, [editingChronicle]);
+  }, [editingChronicle, selectedChronicle]);
 
   const loadChronicles = async () => {
     setLoading(true);
@@ -109,6 +116,41 @@ export default function ChronicleSelector() {
     }
   };
 
+  useEffect(() => {
+    if (!selectedChronicle?.id) {
+      setProcessStatus(null);
+      setProcessLoading(false);
+      return;
+    }
+
+    let cancelled = false;
+    const loadProcessStatus = async () => {
+      try {
+        setProcessLoading(true);
+        const data = await api.getChronicleProcessStatus(selectedChronicle.id);
+        if (!cancelled) {
+          setProcessStatus(data);
+        }
+      } catch (err) {
+        if (!cancelled) {
+          console.error('Failed to load process status', err);
+          setProcessStatus(null);
+        }
+      } finally {
+        if (!cancelled) {
+          setProcessLoading(false);
+        }
+      }
+    };
+
+    loadProcessStatus();
+    const interval = window.setInterval(loadProcessStatus, 4000);
+    return () => {
+      cancelled = true;
+      window.clearInterval(interval);
+    };
+  }, [selectedChronicle?.id]);
+
   const formatChronicleDate = (value) => {
     if (!value) return '';
     const date = new Date(value);
@@ -117,6 +159,37 @@ export default function ChronicleSelector() {
       day: 'numeric',
     });
   };
+
+  const normalizeStatusValue = (value) => String(value ?? '').toLowerCase().replace(/[_\s-]+/g, ' ').trim();
+
+  const activePhase = processStatus?.phases?.find((phase) => phase.status !== 'completed') || processStatus?.phases?.[0] || null;
+  const activeStep = activePhase?.steps?.find((step) => step.status !== 'completed') || activePhase?.steps?.[0] || null;
+  const hasProcessData = Array.isArray(processStatus?.phases) && processStatus.phases.length > 0;
+  const completedSteps = activePhase?.steps?.filter((step) => step.status === 'completed').length || 0;
+  const totalSteps = activePhase?.steps?.length || 0;
+  const progressPercent = hasProcessData && totalSteps > 0 ? Math.round((completedSteps / totalSteps) * 100) : 0;
+  const setupStatus = normalizeStatusValue(selectedChronicle?.setup_status);
+  const phaseStatus = normalizeStatusValue(activePhase?.status);
+  const stepStatus = normalizeStatusValue(activeStep?.status);
+  const activeStatusValues = ['processing', 'in progress', 'started', 'queued'];
+  const isProcessing = Boolean(
+    selectedChronicle && (
+      activeStatusValues.includes(setupStatus) ||
+      activeStatusValues.includes(phaseStatus) ||
+      activeStatusValues.includes(stepStatus)
+    )
+  );
+  const statusSummary = isProcessing
+    ? (activePhase?.phase || activePhase?.status || 'Preparing your chronicle')
+    : (setupStatus === 'not started' || phaseStatus === 'pending' || setupStatus === 'pending'
+        ? 'Waiting to start'
+        : (selectedChronicle?.setup_status || 'Ready'));
+  const statusDetail = isProcessing
+    ? 'We are currently setting up your chronicle.'
+    : 'This chronicle is waiting to begin setup.';
+  const stepSummary = activeStep && hasProcessData
+    ? (activeStep.step || activeStep.status || 'Working through setup')
+    : 'Waiting for the next step to begin';
 
   const searchTerm = search.trim().toLowerCase();
 
@@ -158,6 +231,11 @@ export default function ChronicleSelector() {
         })),
       ].slice(0, 8)
     : [];
+
+  const openChronicle = (chronicle) => {
+    setSelectedChronicle(chronicle);
+    setProcessStatus(null);
+  };
 
   return (
     <main className="flex h-full flex-col overflow-hidden px-6 pb-6 pt-0 text-text">
@@ -285,7 +363,7 @@ export default function ChronicleSelector() {
                 <div key={chronicle.id} className="flex flex-col gap-3">
                   <div
                     className="group relative flex cursor-pointer items-center gap-4 rounded-2xl border border-border/60 bg-surface/70 p-4 shadow-lg shadow-surface/20 transition hover:-translate-y-1 hover:border-accent/40 h-32 overflow-hidden"
-                    onClick={() => navigate(`/chronicle/${encodeURIComponent(chronicle.id)}`)}
+                    onClick={() => openChronicle(chronicle)}
                   >
                     <div className="h-24 w-24 shrink-0 overflow-hidden rounded-xl bg-gradient-to-br from-accent2 to-accent">
                       <div className="flex h-full w-full items-center justify-center text-2xl font-semibold text-text">
@@ -333,6 +411,88 @@ export default function ChronicleSelector() {
             </div>
           )}
         </section>
+
+        {selectedChronicle && (
+          <div className="fixed inset-0 z-[9999] flex items-center justify-center bg-bg/70 p-4 backdrop-blur-sm">
+            <div className="w-full max-w-lg rounded-3xl border border-border/60 bg-surface/95 p-6 shadow-2xl shadow-surface/40">
+              <div className="flex items-start justify-between gap-3">
+                <div>
+                  <p className="text-xs uppercase tracking-[0.26em] text-accent">Chronicle</p>
+                  <h3 className="mt-1 text-2xl font-semibold text-text">{selectedChronicle.title || 'Untitled Chronicle'}</h3>
+                  <p className="mt-2 text-sm text-muted">{selectedChronicle.synopsis || 'No description available.'}</p>
+                </div>
+                <button
+                  type="button"
+                  onClick={() => {
+                    setSelectedChronicle(null);
+                    setProcessStatus(null);
+                  }}
+                  className="rounded-full bg-surface/80 px-3 py-1.5 text-sm text-muted"
+                >
+                  Close
+                </button>
+              </div>
+
+              <div className="mt-6 rounded-2xl border border-border/60 bg-surface/80 p-4">
+                <div className="flex items-center justify-between gap-3">
+                  <div>
+                    <p className="text-xs uppercase tracking-[0.2em] text-muted">Status</p>
+                    <p className="mt-1 text-sm font-medium text-text">{statusSummary}</p>
+                    <p className="mt-1 text-xs text-muted">{statusDetail}</p>
+                  </div>
+                  <button
+                    type="button"
+                    onClick={() => navigate(`/chronicle/${encodeURIComponent(selectedChronicle.id)}`)}
+                    disabled={isProcessing}
+                    className="rounded-full bg-accent px-4 py-2 text-sm font-semibold text-text transition disabled:cursor-not-allowed disabled:opacity-50"
+                  >
+                    {isProcessing ? 'Processing…' : 'Start Chronicle'}
+                  </button>
+                </div>
+
+                <div className="mt-4 rounded-xl border border-border/40 bg-surface/70 p-3">
+                  <div className="flex items-center justify-between text-sm">
+                    <span className="font-medium text-text">Progress</span>
+                    <span className="text-accent">{isProcessing ? `${progressPercent}%` : '100%'}</span>
+                  </div>
+                  <div className="mt-2 h-2 overflow-hidden rounded-full bg-surface/80">
+                    <div
+                      className="h-full rounded-full bg-gradient-to-r from-accent to-accent2 transition-all"
+                      style={{ width: `${isProcessing ? progressPercent : 100}%` }}
+                    />
+                  </div>
+                  <p className="mt-2 text-xs text-muted">
+                    {isProcessing ? `${completedSteps}/${totalSteps} steps completed` : 'All setup steps completed'}
+                  </p>
+                </div>
+
+                <div className="mt-4 space-y-3">
+                  <div className="rounded-xl border border-border/40 bg-surface/70 p-3">
+                    <p className="text-xs uppercase tracking-[0.2em] text-muted">Current phase</p>
+                    <p className="mt-1 text-sm font-medium text-text">
+                      {activePhase ? activePhase.phase || activePhase.status : 'Waiting for status...'}
+                    </p>
+                    <p className="mt-1 text-xs text-muted">
+                      {activePhase ? activePhase.status : 'No phase data yet'}
+                    </p>
+                  </div>
+
+                  <div className="rounded-xl border border-border/40 bg-surface/70 p-3">
+                    <p className="text-xs uppercase tracking-[0.2em] text-muted">Current step</p>
+                    <p className="mt-1 text-sm font-medium text-text">{stepSummary}</p>
+                    <p className="mt-1 text-xs text-muted">
+                      {activeStep ? activeStep.status : 'No step data yet'}
+                    </p>
+                  </div>
+                </div>
+
+                {processLoading && (
+                  <p className="mt-4 text-sm text-muted">Loading processing details…</p>
+                )}
+              </div>
+            </div>
+          </div>
+        )}
     </main>
   );
 }

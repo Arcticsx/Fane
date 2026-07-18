@@ -93,6 +93,11 @@ export const api = {
     return handleResponse(res);
   },
 
+  async getRecentChronicles() {
+    const res = await fetch(`${API_BASE}/story`);
+    return handleResponse(res);
+  },
+
   async getSessions(personaName, personaId) {
     const qs = personaId ? `?persona_id=${encodeURIComponent(personaId)}` : '';
     const res = await fetch(`${API_BASE}/sessions/${encodeURIComponent(personaName)}${qs}`);
@@ -194,8 +199,12 @@ export const api = {
   async getDocumentStatus(sessionId, docId) {
     const res = await fetch(`${API_BASE}/story/${sessionId}/docs/${docId}/status`);
     return handleResponse(res);
-  }
-  ,
+  },
+
+  async getChronicleProcessStatus(sessionId) {
+    const res = await fetch(`${API_BASE}/story/${sessionId}/process-status`);
+    return handleResponse(res);
+  },
   // Chronicle helpers
   async listChronicles() {
     const res = await fetch(`${API_BASE}/story`);

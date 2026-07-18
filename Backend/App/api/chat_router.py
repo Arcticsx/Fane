@@ -12,34 +12,60 @@ from fastapi.staticfiles import StaticFiles
 from pydantic import BaseModel
 from sqlalchemy.orm import Session
 
-from .chronicle_router import router as chronicle_router
-from .documents_router import router as documents_router
-from ..services.chat.personalities import (
-    get_personalities,
-    create_personality,
-    update_personality,
-    delete_personality,
-    pick_personality,
-)
-from ..services.chat.database import (
-    save_session,
-    load_session,
-    get_session_by_index,
-    get_recent_sessions,
-    get_sessions,
-    delete_session,
-)
-from ..services.utility.response import get_response
-from ..services.chat.memory import trim_memory
-from ..services.utility.config import textPrompt, DATA_DIR
-from ..services.utility.getdb import init_db, get_db
+try:
+    from .chronicle_router import router as chronicle_router
+    from .documents_router import router as documents_router
+    from ..services.chat.personalities import (
+        get_personalities,
+        create_personality,
+        update_personality,
+        delete_personality,
+        pick_personality,
+    )
+    from ..services.chat.database import (
+        save_session,
+        load_session,
+        get_session_by_index,
+        get_recent_sessions,
+        get_sessions,
+        delete_session,
+    )
+    from ..services.utility.response import get_response
+    from ..services.chat.memory import trim_memory
+    from ..services.utility.config import textPrompt, DATA_DIR
+    from ..services.utility.getdb import init_db, get_db
+except ImportError:  # pragma: no cover - compatibility for legacy flat imports
+    from app.api.chronicle_router import router as chronicle_router
+    from app.api.documents_router import router as documents_router
+    from app.services.chat.personalities import (
+        get_personalities,
+        create_personality,
+        update_personality,
+        delete_personality,
+        pick_personality,
+    )
+    from app.services.chat.database import (
+        save_session,
+        load_session,
+        get_session_by_index,
+        get_recent_sessions,
+        get_sessions,
+        delete_session,
+    )
+    from app.services.utility.response import get_response
+    from app.services.chat.memory import trim_memory
+    from app.services.utility.config import textPrompt, DATA_DIR
+    from app.services.utility.getdb import init_db, get_db
 
 import os
 import shutil
 import uuid
 from pathlib import Path
+import sys
 router = APIRouter()
 app = FastAPI()
+
+MODULE_NAME = __name__
 
 # Enable CORS for React frontend
 app.add_middleware(
@@ -173,14 +199,14 @@ def pick_persona(body: PickPersonaRequest):
 #------------------SESSIONS----------------------
 @app.get("/sessions/recent")
 def list_recent_sessions(db: Session = Depends(db_dependency)):
-    rows = get_recent_sessions(db)
+    rows = sys.modules[MODULE_NAME].get_recent_sessions(db)
     return {"sessions": rows}
 
 
 @app.get("/sessions/{persona_key}")
 def list_sessions(persona_key: str, db: Session = Depends(db_dependency)):
     try:
-        sessions = get_sessions(db, persona_key)
+        sessions = sys.modules[MODULE_NAME].get_sessions(db, persona_key)
         return {"sessions": sessions}
     except Exception as e:
         import traceback
@@ -190,7 +216,7 @@ def list_sessions(persona_key: str, db: Session = Depends(db_dependency)):
 
 @app.delete("/sessions/{persona_key}/{session_id}")
 def delete_session_endpoint(persona_key: str, session_id: int, db: Session = Depends(db_dependency)):
-    deleted = delete_session(db, session_id)
+    deleted = sys.modules[MODULE_NAME].delete_session(db, session_id)
     if not deleted:
         raise HTTPException(status_code=404, detail="Session not found.")
     return {"deleted": True}
@@ -205,7 +231,7 @@ def pick_session_endpoint(body: PickSessionRequest, db: Session = Depends(db_dep
     if body.index is None:
         return {"session": None, "new": True}
 
-    session = get_session_by_index(db, body.persona_key, body.index - 1)
+    session = sys.modules[MODULE_NAME].get_session_by_index(db, body.persona_key, body.index - 1)
     if not session:
         return {"session": None, "new": True, "warning": "Index out of range, starting new session."}
 
@@ -224,7 +250,7 @@ class LoadSessionRequest(BaseModel):
 @app.post("/sessions/load")
 def load(body: LoadSessionRequest, db: Session = Depends(db_dependency)):
     print("load body:", body)
-    personalities = get_personalities()
+    personalities = sys.modules[MODULE_NAME].get_personalities()
     persona = personalities.get(body.persona_key)
     if not persona:
         raise HTTPException(status_code=404, detail="Persona not found.")
@@ -233,7 +259,7 @@ def load(body: LoadSessionRequest, db: Session = Depends(db_dependency)):
     system_message = {"role": "system", "content": template}
 
     session_dict = body.session.model_dump() if body.session else None
-    context, full_messages = load_session(db, persona, system_message, session_dict)
+    context, full_messages = sys.modules[MODULE_NAME].load_session(db, persona, system_message, session_dict)
 
     clean_messages = [{k: v for k, v in m.items() if k != "id"} for m in full_messages]
     clean_context = [{k: v for k, v in m.items() if k != "id"} for m in context]
@@ -259,12 +285,12 @@ class SaveSessionRequest(BaseModel):
 
 @app.post("/sessions/save")
 def save(body: SaveSessionRequest, db: Session = Depends(db_dependency)):
-    personalities = get_personalities()
+    personalities = sys.modules[MODULE_NAME].get_personalities()
     persona = personalities.get(body.persona_key)
     if not persona:
         raise HTTPException(status_code=404, detail="Persona not found.")
 
-    session_id = save_session(
+    session_id = sys.modules[MODULE_NAME].save_session(
         db,
         body.persona_key,
         messages=body.messages,
@@ -287,7 +313,7 @@ class ChatRequest(BaseModel):
 
 @app.post("/chat")
 def chat(body: ChatRequest):
-    personalities = get_personalities()
+    personalities = sys.modules[MODULE_NAME].get_personalities()
     persona = personalities.get(body.persona_key)
     
     if not persona:
@@ -299,7 +325,7 @@ def chat(body: ChatRequest):
     messages = body.messages + [{"role": "user", "content": body.user_input}]
 
     try:
-        assistant_msg = get_response(messages, mode="chat")
+        assistant_msg = get_response(messages, mode="chat", type="default")
     except RuntimeError as e:
         raise HTTPException(status_code=503, detail=str(e))
 

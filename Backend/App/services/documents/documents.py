@@ -11,7 +11,7 @@ from langchain_core.documents import Document
 from sentence_transformers import SentenceTransformer
 import pymupdf
 import os
-from Backend.App.models.rpg_sessions import SourceDocument
+from ...models.rpg_sessions import SourceDocument
 from ..utility.config import DATA_DIR
 from ..utility.config import EMBEDDING_MODEL
 from ..utility.status import initialize_status, update_status

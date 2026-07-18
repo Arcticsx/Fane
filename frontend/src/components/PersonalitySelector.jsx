@@ -211,7 +211,7 @@ function PersonalitySelector({
   };
 
   return (
-    <div className="flex h-screen text-text">
+    <div className="flex h-screen bg-bg text-text">
       <Sidebar
         activeView={activeView}
         onViewChange={setActiveView}
@@ -222,101 +222,130 @@ function PersonalitySelector({
         }}
       />
 
-      <main className="flex flex-1 flex-col overflow-hidden px-6 pb-6 pt-0">
-        <header className="flex flex-wrap items-center justify-between gap-4 border-b border-border/40 py-5">
-          <div className="group flex max-w-xl flex-1 items-center rounded-full border border-border/60 bg-surface/80 px-3 text-sm text-text shadow-sm shadow-surface/30 transition focus-within:border-accent focus-within:shadow-accent/10">
+      <main className="flex flex-1 flex-col overflow-hidden px-6 pb-8 pt-4">
+        {/* Header */}
+        <header className="mb-6 flex flex-wrap items-center justify-between gap-4 pb-4 border-b border-border/30">
+          {/* Search */}
+          <div className="group flex max-w-xl flex-1 items-center rounded-2xl border border-border/40 bg-surface/70 backdrop-blur-sm px-2 text-sm shadow-sm transition-all focus-within:border-accent focus-within:shadow-accent/20 focus-within:bg-surface/90">
+            <span className="material-symbols-outlined px-3 text-muted/70 transition group-focus-within:text-accent">
+              search
+            </span>
             <input
               type="text"
-              placeholder="Search personalities…"
+              placeholder="Search personalities or chronicles…"
               value={query}
               onChange={(e) => setQuery(e.target.value)}
-              className="w-full bg-transparent px-4 py-2.5 text-sm text-text outline-none transition"
+              className="w-full bg-transparent px-2 py-2.5 text-sm text-text outline-none placeholder:text-muted/50"
             />
-            <span className="material-symbols-outlined px-3 text-muted transition group-focus-within:text-accent">search</span>
           </div>
+
+          {/* Actions */}
           <div className="flex flex-wrap items-center gap-2">
             <button
-              className="rounded-full border border-border/50 bg-surface/80 px-4 py-2 text-sm font-semibold text-text shadow-sm shadow-surface/30 transition hover:-translate-y-0.5 hover:border-accent/40 hover:bg-surface/70"
+              className="flex items-center gap-1.5 rounded-xl border border-border/40 bg-surface/70 px-4 py-2.5 text-sm font-medium text-text shadow-sm transition-all duration-200 hover:-translate-y-0.5 hover:border-accent/50 hover:bg-surface/90 hover:shadow-md active:scale-95"
               onClick={() => setThemeModalOpen(true)}
             >
+              <span className="material-symbols-outlined text-lg">palette</span>
               Theme
             </button>
             <button
-              className="rounded-full bg-accent px-4 py-2 text-sm font-semibold text-text shadow-lg shadow-accent/20 transition hover:-translate-y-0.5"
+              className="flex items-center gap-1.5 rounded-xl bg-accent px-4 py-2.5 text-sm font-semibold text-text shadow-md shadow-accent/20 transition-all duration-200 hover:-translate-y-0.5 hover:shadow-lg hover:shadow-accent/30 active:scale-95"
               onClick={() => navigate('/chronicle')}
             >
-              + Create Chronicle
+              <span className="material-symbols-outlined text-lg">add</span>
+              New Chronicle
             </button>
             <button
-              className="rounded-full bg-accent px-4 py-2 text-sm font-semibold text-text shadow-lg shadow-accent/20 transition hover:-translate-y-0.5"
+              className="flex items-center gap-1.5 rounded-xl bg-accent px-4 py-2.5 text-sm font-semibold text-text shadow-md shadow-accent/20 transition-all duration-200 hover:-translate-y-0.5 hover:shadow-lg hover:shadow-accent/30 active:scale-95"
               onClick={() => {
                 setEditingPersonaKey(null);
                 setModalInitialData(null);
                 setEditModalOpen(true);
               }}
             >
-              + Create New Persona
+              <span className="material-symbols-outlined text-lg">person_add</span>
+              New Persona
             </button>
           </div>
         </header>
 
-        {error && <div className="mb-3 rounded-xl border border-accent/40 bg-accent/10 px-4 py-3 text-sm text-accent">{error}</div>}
-        {toast && <div className="mb-3 rounded-xl border border-accent2/40 bg-accent2/10 px-4 py-3 text-sm text-accent2">{toast}</div>}
+        {/* Notifications */}
+        {error && (
+          <div className="mb-4 flex items-center gap-2 rounded-2xl border border-red-400/40 bg-red-400/10 px-4 py-3 text-sm text-red-300 backdrop-blur-sm">
+            <span className="material-symbols-outlined text-base">error</span>
+            {error}
+          </div>
+        )}
+        {toast && (
+          <div className="mb-4 flex items-center gap-2 rounded-2xl border border-emerald-400/40 bg-emerald-400/10 px-4 py-3 text-sm text-emerald-300 backdrop-blur-sm">
+            <span className="material-symbols-outlined text-base">check_circle</span>
+            {toast}
+          </div>
+        )}
 
-        <section className="flex-1 overflow-y-auto pr-1">
-          <div className="mb-6 rounded-[24px] border border-border/40 bg-gradient-to-br from-surface/90 to-surface/70 p-4 shadow-sm shadow-surface/40">
-            <div className="mb-4 flex items-center justify-between gap-3">
-              <div>
-                <h2 className="text-lg font-semibold text-accent">Chronicles</h2>
-              </div>
+        <section className="flex-1 overflow-y-auto pr-1 space-y-8">
+          {/* Chronicles Section */}
+          <div className="rounded-2xl border border-border/20 bg-surface/40 p-5 backdrop-blur-md shadow-lg">
+            <div className="mb-5 flex items-center justify-between">
+              <h2 className="text-lg font-bold text-accent flex items-center gap-2">
+                <span className="material-symbols-outlined">auto_stories</span>
+                Chronicles
+              </h2>
             </div>
 
             {chroniclesLoading ? (
-              <div className="py-8 text-center text-muted">Loading chronicles…</div>
+              <div className="flex items-center justify-center py-12 text-muted">
+                <span className="material-symbols-outlined animate-spin mr-2">progress_activity</span>
+                Loading chronicles…
+              </div>
             ) : filteredChronicles.length === 0 ? (
-              <div className="rounded-2xl border border-border/60 bg-surface/80 px-6 py-10 text-center text-muted">
-                No chronicles yet. Create one to get started.
+              <div className="rounded-xl border border-dashed border-border/50 bg-surface/30 px-6 py-12 text-center text-muted/80">
+                <span className="material-symbols-outlined text-3xl mb-2 block">auto_stories</span>
+                No chronicles yet. Create your first story.
               </div>
             ) : (
-              <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4">
+              <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4">
                 {filteredChronicles.map((chronicle) => (
                   <div
                     key={chronicle.id}
-                    className="group relative flex h-32 cursor-pointer items-center gap-4 overflow-hidden rounded-[20px] border border-border/60 bg-surface/80 p-4 shadow-md shadow-surface/25 transition hover:-translate-y-1 hover:border-accent/40 hover:shadow-lg"
+                    className="group relative flex h-36 cursor-pointer items-center gap-4 overflow-hidden rounded-2xl border border-border/30 bg-surface/70 p-4 shadow-md transition-all duration-200 hover:-translate-y-1 hover:border-accent/50 hover:shadow-xl hover:bg-surface/90"
                     onClick={() => navigate(`/chronicle/${encodeURIComponent(chronicle.id)}`)}
                   >
-                    <div className="h-24 w-24 shrink-0 overflow-hidden rounded-xl bg-gradient-to-br from-accent2 to-accent">
-                      <div className="flex h-full w-full items-center justify-center text-2xl font-semibold text-text">
+                    {/* Chronicle avatar */}
+                    <div className="h-20 w-20 shrink-0 overflow-hidden rounded-xl bg-gradient-to-br from-accent/80 to-accent2/80 shadow-inner">
+                      <div className="flex h-full w-full items-center justify-center text-2xl font-bold text-white/90">
                         {chronicle.title?.charAt(0) || 'C'}
                       </div>
                     </div>
 
-                    <div className="flex h-24 flex-1 flex-col justify-between overflow-hidden">
-                      <div className="min-h-0 flex-1">
-                        <div className="flex items-center justify-between gap-2">
-                          <h3 className="truncate text-base font-semibold text-text">{chronicle.title}</h3>
-                        </div>
-                        <p className="mt-1 text-sm text-muted line-clamp-2 break-words">{chronicle.synopsis || 'No description available.'}</p>
+                    <div className="flex h-20 flex-1 flex-col justify-between overflow-hidden">
+                      <div>
+                        <h3 className="truncate text-base font-semibold text-text">
+                          {chronicle.title}
+                        </h3>
+                        <p className="mt-1 text-xs text-muted/80 line-clamp-2">
+                          {chronicle.synopsis || 'No description available.'}
+                        </p>
                       </div>
 
-                      <div className="flex items-center justify-between text-xs text-muted">
+                      <div className="flex items-center justify-between text-xs text-muted/70">
                         <span>{formatChronicleDate(chronicle.created_at)}</span>
-                        <div className="flex gap-2 opacity-0 transition group-hover:opacity-100">
+                        <div className="flex gap-1 opacity-0 transition group-hover:opacity-100">
                           <button
                             type="button"
                             onClick={(e) => handleEditChronicle(e, chronicle)}
-                            className="rounded-full border border-border/40 bg-surface/90 p-2 text-text shadow-sm shadow-surface/30 transition hover:-translate-y-0.5 hover:bg-accent/15 hover:text-accent"
+                            className="rounded-full border border-border/40 bg-surface/90 p-1.5 text-text/80 transition hover:-translate-y-0.5 hover:bg-accent/20 hover:text-accent"
                             title="Edit"
                           >
-                            <span className="material-symbols-outlined text-base">edit</span>
+                            <span className="material-symbols-outlined text-sm">edit</span>
                           </button>
                           <button
                             type="button"
                             onClick={(e) => handleDeleteChronicle(e, chronicle)}
-                            className="rounded-full border border-border/40 bg-surface/90 p-2 text-text shadow-sm shadow-surface/30 transition hover:-translate-y-0.5 hover:bg-accent2/15 hover:text-accent2"
+                            className="rounded-full border border-border/40 bg-surface/90 p-1.5 text-text/80 transition hover:-translate-y-0.5 hover:bg-red-400/20 hover:text-red-400"
                             title="Delete"
                           >
-                            <span className="material-symbols-outlined text-base">delete</span>
+                            <span className="material-symbols-outlined text-sm">delete</span>
                           </button>
                         </div>
                       </div>
@@ -327,72 +356,82 @@ function PersonalitySelector({
             )}
           </div>
 
-          {loading ? (
-            <div className="py-20 text-center text-muted">Loading personalities…</div>
-          ) : filteredList.length === 0 ? (
-            <div className="rounded-2xl border border-border/60 bg-surface/80 px-6 py-16 text-center text-muted">
-              <p>No personalities found. Create one to get started.</p>
+          {/* Personalities Section */}
+          <div>
+            <div className="mb-5 flex items-center justify-between">
+              <h2 className="text-lg font-bold text-accent flex items-center gap-2">
+                <span className="material-symbols-outlined">groups</span>
+                Discover Personalities
+              </h2>
             </div>
-          ) : (
-            <div className="space-y-4">
-              <div>
-                <h2 className="mb-4 text-lg font-semibold text-accent">Discover</h2>
-                {/* 4‑column grid */}
-                <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4">
-                  {filteredList.map((persona) => (
-                    <div
-                      key={persona.key}
-                      className="group relative flex h-32 cursor-pointer items-center gap-4 overflow-hidden rounded-[20px] border border-border/60 bg-surface/80 p-4 shadow-md shadow-surface/25 transition hover:-translate-y-1 hover:border-accent/40 hover:shadow-lg"
-                      onClick={() => handlePersonaClick(persona)}
-                    >
-                      {/* Square avatar */}
-                      <div className="h-24 w-24 shrink-0 overflow-hidden rounded-[16px] border border-white/10 bg-gradient-to-br from-accent2 to-accent shadow-inner">
-                        {persona.avatar ? (
-                          <img
-                            src={getImageUrl(persona.avatar)}
-                            alt={persona.name}
-                            className="h-full w-full object-cover"
-                          />
-                        ) : (
-                          <div className="flex h-full w-full items-center justify-center text-2xl font-semibold text-text">
-                            {persona.name.charAt(0)}
-                          </div>
-                        )}
+
+            {loading ? (
+              <div className="flex items-center justify-center py-20 text-muted">
+                <span className="material-symbols-outlined animate-spin mr-2">progress_activity</span>
+                Loading personalities…
+              </div>
+            ) : filteredList.length === 0 ? (
+              <div className="rounded-2xl border border-dashed border-border/50 bg-surface/30 px-6 py-16 text-center text-muted/80">
+                <span className="material-symbols-outlined text-3xl mb-2 block">person_off</span>
+                No personalities found. Create your first persona.
+              </div>
+            ) : (
+              <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4">
+                {filteredList.map((persona) => (
+                  <div
+                    key={persona.key}
+                    className="group relative flex h-36 cursor-pointer items-center gap-4 overflow-hidden rounded-2xl border border-border/30 bg-surface/70 p-4 shadow-md transition-all duration-200 hover:-translate-y-1 hover:border-accent/50 hover:shadow-xl hover:bg-surface/90"
+                    onClick={() => handlePersonaClick(persona)}
+                  >
+                    {/* Avatar */}
+                    <div className="h-20 w-20 shrink-0 overflow-hidden rounded-xl border-2 border-white/10 bg-gradient-to-br from-accent/80 to-accent2/80 shadow-inner">
+                      {persona.avatar ? (
+                        <img
+                          src={getImageUrl(persona.avatar)}
+                          alt={persona.name}
+                          className="h-full w-full object-cover"
+                        />
+                      ) : (
+                        <div className="flex h-full w-full items-center justify-center text-2xl font-bold text-white/90">
+                          {persona.name.charAt(0)}
+                        </div>
+                      )}
+                    </div>
+
+                    {/* Info */}
+                    <div className="flex h-20 flex-1 flex-col justify-between overflow-hidden">
+                      <div>
+                        <h3 className="truncate text-base font-semibold text-text">
+                          {persona.name}
+                        </h3>
+                        <p className="mt-1 text-xs text-muted/80 line-clamp-2">
+                          {persona.description || "No description"}
+                        </p>
                       </div>
 
-                      {/* Info — fixed height */}
-                      <div className="flex h-24 flex-1 flex-col justify-between overflow-hidden">
-                        <div className="min-h-0 flex-1">
-                          <h3 className="text-base font-semibold text-text truncate">{persona.name}</h3>
-                          <p className="mt-1 text-sm text-muted line-clamp-2 break-words">
-                            {persona.description || "No description"}
-                          </p>
-                        </div>
-
-                        {/* Edit/Delete buttons */}
-                        <div className="flex justify-end gap-2 opacity-0 transition group-hover:opacity-100">
-                          <button
-                            className="rounded-full border border-border/40 bg-surface/90 px-3 py-1.5 text-sm text-text shadow-sm shadow-surface/30 transition hover:-translate-y-0.5 hover:bg-accent/15 hover:text-accent"
-                            onClick={(e) => handleEditPersona(e, persona)}
-                            title="Edit"
-                          >
-                            <span className="material-symbols-outlined text-base">edit</span>
-                          </button>
-                          <button
-                            className="rounded-full border border-border/40 bg-surface/90 px-3 py-1.5 text-sm text-text shadow-sm shadow-surface/30 transition hover:-translate-y-0.5 hover:bg-accent2/15 hover:text-accent2"
-                            onClick={(e) => handleDeletePersona(e, persona)}
-                            title="Delete"
-                          >
-                            <span className="material-symbols-outlined text-base">delete</span>
-                          </button>
-                        </div>
+                      {/* Actions */}
+                      <div className="flex justify-end gap-1 opacity-0 transition group-hover:opacity-100">
+                        <button
+                          className="rounded-full border border-border/40 bg-surface/90 p-1.5 text-text/80 transition hover:-translate-y-0.5 hover:bg-accent/20 hover:text-accent"
+                          onClick={(e) => handleEditPersona(e, persona)}
+                          title="Edit"
+                        >
+                          <span className="material-symbols-outlined text-sm">edit</span>
+                        </button>
+                        <button
+                          className="rounded-full border border-border/40 bg-surface/90 p-1.5 text-text/80 transition hover:-translate-y-0.5 hover:bg-red-400/20 hover:text-red-400"
+                          onClick={(e) => handleDeletePersona(e, persona)}
+                          title="Delete"
+                        >
+                          <span className="material-symbols-outlined text-sm">delete</span>
+                        </button>
                       </div>
                     </div>
-                  ))}
-                </div>
+                  </div>
+                ))}
               </div>
-            </div>
-          )}
+            )}
+          </div>
         </section>
       </main>
 
@@ -408,58 +447,59 @@ function PersonalitySelector({
           onHoverPreview={onHoverPreview}
           onHoverPreviewEnd={onHoverPreviewEnd}
           onDeleteTheme={onDeleteTheme}
-            onUpdateTheme={onUpdateTheme}
+          onUpdateTheme={onUpdateTheme}
         />
       </ThemeModal>
 
+      {/* Chronicle Edit Modal (refined) */}
       {editingChronicle && (
-        <div className="fixed inset-0 z-[9998] flex items-center justify-center bg-bg/70 p-4">
-          <div className="w-full max-w-md rounded-3xl border border-border/60 bg-surface/90 p-6 shadow-2xl shadow-surface/40 backdrop-blur-xl">
-            <h3 className="text-xl font-semibold text-text">Edit Chronicle</h3>
-            <form onSubmit={handleSaveChronicle} className="mt-4 space-y-4">
+        <div className="fixed inset-0 z-[9998] flex items-center justify-center bg-black/50 backdrop-blur-sm p-4">
+          <div className="w-full max-w-md rounded-2xl border border-border/30 bg-surface/90 p-6 shadow-2xl shadow-black/30 backdrop-blur-xl">
+            <h3 className="text-xl font-bold text-text mb-1">Edit Chronicle</h3>
+            <p className="text-sm text-muted mb-5">Update the details of your story</p>
+            <form onSubmit={handleSaveChronicle} className="space-y-4">
               <div>
                 <label className="mb-1 block text-sm font-medium text-muted">Title</label>
                 <input
                   value={chronicleForm.title}
                   onChange={(e) => setChronicleForm((prev) => ({ ...prev, title: e.target.value }))}
-                  className="w-full rounded-xl border border-border/60 bg-surface px-3 py-2 text-sm text-text outline-none focus:border-accent"
-                />
-              </div>
-              <div>
-                <label className="mb-1 block text-sm font-medium text-muted">Description</label>
-                <textarea
-                  value={chronicleForm.description}
-                  onChange={(e) => setChronicleForm((prev) => ({ ...prev, description: e.target.value, synopsis: e.target.value }))}
-                  rows={3}
-                  className="min-h-[90px] w-full rounded-xl border border-border/60 bg-surface px-3 py-2 text-sm text-text outline-none focus:border-accent"
+                  className="w-full rounded-xl border border-border/40 bg-surface/80 px-4 py-2.5 text-sm text-text outline-none transition focus:border-accent focus:ring-1 focus:ring-accent/30"
+                  placeholder="Chronicle title"
                 />
               </div>
               <div>
                 <label className="mb-1 block text-sm font-medium text-muted">Synopsis</label>
                 <textarea
                   value={chronicleForm.synopsis}
-                  onChange={(e) => setChronicleForm((prev) => ({ ...prev, synopsis: e.target.value }))}
-                  rows={3}
-                  className="min-h-[100px] w-full rounded-xl border border-border/60 bg-surface px-3 py-2 text-sm text-text outline-none focus:border-accent"
+                  onChange={(e) =>
+                    setChronicleForm((prev) => ({
+                      ...prev,
+                      synopsis: e.target.value,
+                      description: e.target.value,
+                    }))
+                  }
+                  rows={4}
+                  className="w-full rounded-xl border border-border/40 bg-surface/80 px-4 py-2.5 text-sm text-text outline-none transition focus:border-accent focus:ring-1 focus:ring-accent/30 resize-none"
+                  placeholder="Brief summary of your chronicle"
                 />
               </div>
-              <div className="flex justify-end gap-2">
+              <div className="flex justify-end gap-3 pt-2">
                 <button
                   type="button"
                   onClick={() => {
                     setEditingChronicle(null);
                     setChronicleForm({ title: '', description: '', synopsis: '' });
                   }}
-                  className="rounded-lg bg-surface/80 px-3 py-2 text-sm text-text"
+                  className="rounded-xl border border-border/40 bg-surface/70 px-5 py-2.5 text-sm font-medium text-text transition hover:bg-surface/90 active:scale-95"
                 >
                   Cancel
                 </button>
                 <button
                   type="submit"
                   disabled={chronicleSaving}
-                  className="rounded-lg bg-accent px-3 py-2 text-sm font-semibold text-text"
+                  className="rounded-xl bg-accent px-5 py-2.5 text-sm font-semibold text-text shadow-md shadow-accent/20 transition hover:bg-accent/90 active:scale-95 disabled:opacity-60"
                 >
-                  {chronicleSaving ? 'Saving...' : 'Save'}
+                  {chronicleSaving ? 'Saving...' : 'Save Changes'}
                 </button>
               </div>
             </form>
