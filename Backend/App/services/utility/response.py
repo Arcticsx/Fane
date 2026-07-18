@@ -83,135 +83,28 @@ CHARACTER_FIGHTING_STYLE_SCHEMA = {
 }
 
 
-def get_client(mode, type):
-    
-    if mode == "chat":
-        if PROVIDER == "deepseek":
-            try:
-                return ChatOpenAI(
-                    model=AISUITE_MODEL,
-                    api_key=API_KEY,
-                    base_url="https://api.deepseek.com",
-                    temperature=0
-                )
-            except Exception as e:
-                print(f"[Warning] deepseek client init failed: {e}")
-                # fall through to stub
+def _get_schema(mode, type=None):
+    if mode == "chronicle_beats":
+        return BEAT_SCHEMA
+    if mode == "chronicle_entities":
+        return ENTITIES_SCHEMA
+    if mode == "characters":
+        schemas = {
+            "personality": CHARACTER_PERSONALITY_SCHEMA,
+            "backstory": CHARACTER_BACKSTORY_SCHEMA,
+            "fighting_style": CHARACTER_FIGHTING_STYLE_SCHEMA,
+        }
+        return schemas.get(type, CHARACTER_FIGHTING_STYLE_SCHEMA)
+    return None 
 
-        elif PROVIDER == "ollama":
-            try:
-                from langchain_ollama import ChatOllama
-                model_name = AISUITE_MODEL
-                if model_name and ":" in model_name:
-                    model_name = model_name.split(":", 1)[1]
-                return ChatOllama(
-                    model=model_name,
-                    base_url="http://localhost:11434",
-                    temperature=0,
-                )
-            except Exception as e:
-                print(f"[Warning] ollama client init failed: {e}")
-    elif mode == "chronicle_beats":
-        if PROVIDER == "deepseek":
-            try:
-                return ChatOpenAI(
-                    model=AISUITE_MODEL,
-                    api_key=API_KEY,
-                    base_url="https://api.deepseek.com",
-                    temperature=0,
-                    format=BEAT_SCHEMA,
-                )
-            except Exception as e:
-                print(f"[Warning] deepseek client init failed: {e}")
-                # fall through to stub
 
-        elif PROVIDER == "ollama":
-            try:
-                from langchain_ollama import ChatOllama
-                model_name = AISUITE_MODEL
-                if model_name and ":" in model_name:
-                    model_name = model_name.split(":", 1)[1]
-                return ChatOllama(
-                    model=model_name,
-                    base_url="http://localhost:11434",
-                    temperature=0,
-                    num_ctx=8192,
-                    format=BEAT_SCHEMA,
-                )
-            except Exception as e:
-                print(f"[Warning] ollama client init failed: {e}")
-    
-    elif mode == "chronicle_entities":
-        if PROVIDER == "deepseek":
-            try:
-                return ChatOpenAI(
-                    model=AISUITE_MODEL,
-                    api_key=API_KEY,
-                    base_url="https://api.deepseek.com",
-                    temperature=0,
-                    format=ENTITIES_SCHEMA,
-                )
-            except Exception as e:
-                print(f"[Warning] deepseek client init failed: {e}")
-                # fall through to stub
-
-        elif PROVIDER == "ollama":
-            try:
-                from langchain_ollama import ChatOllama
-                model_name = AISUITE_MODEL
-                if model_name and ":" in model_name:
-                    model_name = model_name.split(":", 1)[1]
-                return ChatOllama(
-                    model=model_name,
-                    base_url="http://localhost:11434",
-                    temperature=0,
-                    num_ctx=8192,
-                    format=ENTITIES_SCHEMA,
-                )
-            except Exception as e:
-                print(f"[Warning] ollama client init failed: {e}")
-        
-    elif mode == "characters":
-        if PROVIDER == "deepseek":
-            try:
-                return ChatOpenAI(
-                    model=AISUITE_MODEL,
-                    api_key=API_KEY,
-                    base_url="https://api.deepseek.com",
-                    temperature=0,
-                    format=CHARACTER_PERSONALITY_SCHEMA if type == "personality" else (CHARACTER_BACKSTORY_SCHEMA if type == "backstory" else CHARACTER_FIGHTING_STYLE_SCHEMA),
-                )
-            except Exception as e:
-                print(f"[Warning] deepseek client init failed: {e}")
-                # fall through to stub
-
-        elif PROVIDER == "ollama":
-            try:
-                from langchain_ollama import ChatOllama
-                model_name = AISUITE_MODEL
-                if model_name and ":" in model_name:
-                    model_name = model_name.split(":", 1)[1]
-                return ChatOllama(
-                    model=model_name,
-                    base_url="http://localhost:11434",
-                    temperature=0,
-                    num_ctx=8192,
-                    format=CHARACTER_PERSONALITY_SCHEMA if type == "personality" else (CHARACTER_BACKSTORY_SCHEMA if type == "backstory" else CHARACTER_FIGHTING_STYLE_SCHEMA),
-                )
-            except Exception as e:
-                print(f"[Warning] ollama client init failed: {e}")
-    
-    
-
-    # Fallback: when no provider is configured (local development/tests),
-    # return a simple deterministic stub client so `/chat` remains usable.
+def _stub_client():
     class _StubResponse:
         def __init__(self, content):
             self.content = content
 
     class _StubClient:
         def invoke(self, prompt):
-            # If prompt is a list of messages, echo the last user message
             try:
                 if isinstance(prompt, (list, tuple)) and prompt:
                     last = prompt[-1]
@@ -224,6 +117,45 @@ def get_client(mode, type):
                 return _StubResponse("Echo: Hello from local stub client.")
 
     return _StubClient()
+
+
+def get_client(mode, type=None):
+    schema = _get_schema(mode, type)
+
+    try:
+        if PROVIDER == "deepseek":
+            kwargs = {
+                "model": AISUITE_MODEL,
+                "api_key": API_KEY,
+                "base_url": "https://api.deepseek.com",
+                "temperature": 0,
+            }
+            if schema is not None:
+                kwargs["format"] = schema
+            return ChatOpenAI(**kwargs)
+
+        elif PROVIDER == "ollama":
+            from langchain_ollama import ChatOllama
+
+            model_name = AISUITE_MODEL
+            if model_name and ":" in model_name:
+                model_name = model_name.split(":", 1)[1]
+
+            kwargs = {
+                "model": model_name,
+                "base_url": "http://localhost:11434",
+                "temperature": 0,
+            }
+            if schema is not None:
+                kwargs["num_ctx"] = 8192
+                kwargs["format"] = schema
+            return ChatOllama(**kwargs)
+
+    except Exception as e:
+        print(f"[Warning] {PROVIDER} client init failed: {e}")
+        # fall through to stub
+
+    return _stub_client()
 
 
 
