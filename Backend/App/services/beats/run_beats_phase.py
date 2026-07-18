@@ -18,7 +18,7 @@ def run_beats_phase(source_doc_id: str, session_id: str):
 
     candidate_beats = _step_beats_extract(source_doc_id, session_id)
 
-    candidate_beats, final_beats = _step_beats_reduce(source_doc_id, session_id, candidate_beats, final_beats)
+    final_beats = _step_beats_reduce(source_doc_id, session_id, candidate_beats, final_beats)
 
     _step_beats_save_reduced(source_doc_id, session_id, final_beats)
 
@@ -162,7 +162,7 @@ def _step_beats_reduce(source_doc_id: str, session_id: str, candidate_beats: lis
         with get_db() as db:
             complete_step(db, session_id, phase, step)
 
-        return candidate_beats, final_beats
+        return final_beats
 
     except Exception as e:
         with get_db() as db:

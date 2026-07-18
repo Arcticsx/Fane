@@ -21,6 +21,7 @@ PIPELINE_PHASES = [
 PHASE_STEPS = {
     "story_beats": [
         ("beats_extract",         600),
+        ("beats_save_candidates", 601),
         ("beats_reduce",          602),
         ("beats_save_reduced",    603),
         ("beats_graph",           604),

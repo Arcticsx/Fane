@@ -6,7 +6,7 @@ from Backend.App.services.utility.utility_functions import estimate_tokens
 
 from ..utility.response import get_response
 from ..utility.getdb import get_db
-from ...models.rpg_sessions import Character, CharacterArcState, CharacterSegment, CharacterSpan, SourceDocument, ChronicleChapter
+from ...models.rpg_sessions import Character, CharacterArcState, CharacterSegment, CharacterSpan, ChronicleChapter
 from ..documents.vectorstore import query_chroma_by_page_range
 from ..documents.documents import token_length
 
@@ -77,75 +77,6 @@ Data:
 {data}
 """
 
-
-
-def process_characters(session_id, source_document_id, characters):
-    
-    ranked_characters = rank_characters(characters)
-    
-    with get_db() as db:
-        source_document = db.query(SourceDocument).filter(SourceDocument.id == source_document_id).first()
-        book_total_pages = source_document.total_pages if source_document else 0
-    
-    
-    spanned_characters = []
-    for character in ranked_characters:
-        span_stats = span_statistic_of_character(character, book_total_pages)
-        spanned_characters.append(span_stats)
-        
-    
-    persist_characters_in_chapters(spanned_characters, session_id)
-    print(f"[process_characters] Persisted characters in chapters for session {session_id}", file=sys.stderr)
-    
-    if persist_characters(session_id, spanned_characters, source_document_id):
-        print(f"[process_characters] Persisted characters in database for session {session_id}", file=sys.stderr)
-    else:
-        print(f"[process_characters] Failed to persist characters in database for session {session_id}", file=sys.stderr)
-    
-    
-    for character in spanned_characters:
-        if persist_character_spans(session_id, character):
-            print(f"[process_characters] Persisted character spans in database for session {session_id}", file=sys.stderr)
-        else:
-            print(f"[process_characters] Failed to persist character spans in database for session {session_id}", file=sys.stderr)
-
-    
-    segmented_characters = segment_characters(spanned_characters, book_total_chapters=len(db.query(ChronicleChapter).filter(ChronicleChapter.session_id == session_id).all()))
-    
-    
-    for character in segmented_characters:
-        if persist_character_segments(session_id, character):
-            print(f"[process_characters] Persisted character segments in database for session {session_id}", file=sys.stderr)
-        else:
-            print(f"[process_characters] Failed to persist character segments in database for session {session_id}", file=sys.stderr)
-    
-    arc_states = []
-    characters = db.query(Character).filter(Character.session_id == session_id).all()
-    for character in characters:
-       
-        segments = db.query(CharacterSegment).filter(CharacterSegment.character_id == character.id).all()
-        for segment in segments:
-            arc_state = db.query(CharacterArcState).filter(
-                CharacterArcState.character_id == character.id,
-                CharacterArcState.segment_id == segment.id
-            ).first()
-            if not arc_state:
-                arc_states.append(process_arc_records(session_id, segment.id))
-                print(f"[process_characters] Processed arc records for character {character.name} and segment {segment.segment_number} in session {session_id}", file=sys.stderr)
-            else:
-                print(f"[process_characters] Arc record already exists for character {character.name} and segment {segment.segment_number} in session {session_id}, skipping.", file=sys.stderr)
-    arc_records = []
-    for arc_state in arc_states:
-        if arc_state is None:
-            continue
-        try:
-            arc_records.append(persist_arc_records(session_id=session_id, arc_state=arc_state, segment_id=arc_state["segment_id"], character_id=arc_state["character_id"]))
-        except Exception as e:
-            print(f"[process_characters] Error persisting arc records for character_id {arc_state['character_id']} and segment_id {arc_state['segment_id']} in session {session_id}: {e}", file=sys.stderr)
-            continue
-        
-    print(arc_records)
-    
 
 def rank_characters(characters):
     return sorted(characters, key=lambda c: (c.get("total_pages", 0), len(c.get("spans", []))), reverse=True)

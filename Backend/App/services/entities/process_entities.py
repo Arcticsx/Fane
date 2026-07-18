@@ -1,14 +1,9 @@
-from os import name
 import sys
 import time
 
-from ...models.rpg_sessions import SourceDocument
 from ..utility.response import get_response
-from ..beats.extraction import _assemble_pages_text, _normalize_beat, _parse_json_response, extract_beats_from_window
+from ..beats.extraction import _assemble_pages_text, _parse_json_response
 from ..documents.vectorstore import query_chroma_by_page_range
-from .entities_reduce import merge_entity_clusters
-from ..documents.documents import generate_page_windows
-from ..utility.getdb import get_db
 SYSTEM_PROMPT = '''
 You are an entity extraction system for a narrative processing pipeline. Given a chunk of novel text, covering pages {start_page}-{end_page}, extract every distinct named entity that is explicitly present in the text.
 
@@ -41,91 +36,6 @@ Example output:
 TEXT:
 {text}
 '''
-
-def process_entities(session_id, source_document_id):
-    with get_db() as db:
-      source_doc = db.query(SourceDocument).filter(SourceDocument.id == source_document_id).first()
-      
-      if not source_doc or not source_doc.total_pages:
-                raise ValueError(
-                        f"[process_entities] Source document missing or has no total_pages: "
-                        f"session_id={session_id}, source_document_id={source_document_id}, source_doc={source_doc}"
-                )
-      
-      windows = generate_page_windows(total_pages=source_doc.total_pages, window_size=5, overlap=1)
-      candidate_entities = []
-      consecutive_failures = 0
-
-      for start_page, end_page in windows:
-        try:
-            entities = extract_entities_from_window(session_id, start_page, end_page)
-            candidate_entities.append(entities)
-            consecutive_failures = 0
-        except Exception as e:
-            consecutive_failures += 1
-            print(
-                f"[process_entities] Error extracting pages {start_page}-{end_page} "
-                f"for {source_document_id}: {e}",
-                file=sys.stderr,
-            )
-            if "connection refused" in str(e).lower() or "server disconnected" in str(e).lower():
-                print(f"[process_entities] Ollama appears unresponsive, backing off 15s", file=sys.stderr)
-                time.sleep(15)
-                try:
-                    entities = extract_entities_from_window(session_id, start_page, end_page)
-                    candidate_entities.append(entities)
-                    consecutive_failures = 0
-                except Exception as retry_e:
-                    print(f"[process_entities] Retry also failed: {retry_e}", file=sys.stderr)
-
-            if consecutive_failures >= 5:
-                raise RuntimeError(
-                    f"Too many consecutive extraction failures ({consecutive_failures}); "
-                    f"aborting rather than continuing to degrade. "
-                    f"session_id={session_id}, source_document_id={source_document_id}, "
-                    f"window={start_page}-{end_page}"
-                )
-        finally:
-            time.sleep(3)
-        
-    try:
-        merged_entities = merge_entity_clusters(candidate_entities)
-    except Exception as merge_error:
-        print(
-            f"[process_entities] Failed to merge {len(candidate_entities)} candidate entities for "
-            f"session_id={session_id}, source_document_id={source_document_id}: {type(merge_error).__name__}: {merge_error}",
-            file=sys.stderr,
-        )
-        raise
-    
-    spanned_entities = []
-    
-    for entity in merged_entities:
-        spans, total_pages = span_construction(entity["pages"], gap_tolerance=2)
-        spanned_entities.append({
-            "name": entity["name"],
-            "type": entity["type"],
-            "spans": spans,
-            "total_pages": total_pages
-        })
-        
-
-    total_candidates = sum(len(c) for c in candidate_entities)
-    print(
-        f"[process_entities] Merged {total_candidates} candidate entities into {len(spanned_entities)} unique entities",
-        file=sys.stderr,
-    )
-    print(f"[process_entities] Final merged entities: {spanned_entities}", file=sys.stderr)
-    
-    characters, lore = seperate_candidates(spanned_entities)
-    
-    print(f"[process_entities] Processed characters: {characters}")
-    
-    return characters, lore
-
-
-
-
 
 def _normalize_entity(entity):
     if not isinstance(entity, dict):
