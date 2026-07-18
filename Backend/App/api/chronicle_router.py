@@ -13,6 +13,8 @@ from ..services.utility.getdb import get_db_session
 from ..models.rpg_sessions import (
     ChronicleChapter,
     ChronicleMessages,
+    ProcessStatus,
+    ProcessStep,
     RpgSession,
     SourceDocument,
     StoryBeat,
@@ -221,4 +223,48 @@ async def chronicle_chat(
         "message": assistant_response,
         "messages": chat_messages,
         "timestamp": datetime.now(timezone.utc).isoformat(),
+    }
+
+
+@router.get("/{session_id}/process-status")
+async def get_process_status(session_id: str, db: Session = Depends(get_db_session)):
+    session = db.query(RpgSession).filter(RpgSession.id == session_id).first()
+    if not session:
+        raise HTTPException(status_code=404, detail="Session not found")
+
+    phases = (
+        db.query(ProcessStatus)
+        .filter(ProcessStatus.session_id == session_id)
+        .all()
+    )
+
+    phase_list = []
+    for ps in phases:
+        steps = sorted(ps.steps, key=lambda s: s.order)
+        phase_list.append({
+            "phase": ps.phase,
+            "status": ps.status,
+            "error": ps.error,
+            "started_at": ps.started_at.isoformat() if ps.started_at else None,
+            "completed_at": ps.completed_at.isoformat() if ps.completed_at else None,
+            "steps": [
+                {
+                    "step": s.step,
+                    "order": s.order,
+                    "status": s.status,
+                    "error": s.error,
+                    "started_at": s.started_at.isoformat() if s.started_at else None,
+                    "completed_at": s.completed_at.isoformat() if s.completed_at else None,
+                }
+                for s in steps
+            ],
+        })
+
+    completed_phases = sum(1 for p in phase_list if p["status"] == "completed")
+
+    return {
+        "session_id": session_id,
+        "total_phases": len(phase_list),
+        "completed_phases": completed_phases,
+        "phases": phase_list,
     }

@@ -112,7 +112,7 @@ class ProcessStep(Base):
 
     __table_args__ = (
         UniqueConstraint("session_id", "phase", "step", name="uq_session_phase_step"),
-    )
+    )   
 
 class SourceDocument(Base):
     __tablename__ = "source_document"
@@ -260,6 +260,8 @@ class StoryBeat(Base):
     source_document = relationship("SourceDocument", back_populates="story_beats")
     starting_page = Column(Integer, nullable=True)  # optional starting page number in the source document
     ending_page = Column(Integer, nullable=True)  # optional ending page number in the source document
+    window_start_page = Column(Integer, nullable=True)  # optional starting page number of the window
+    window_end_page = Column(Integer, nullable=True)  # optional ending page number of the window
     description = Column(Text)
     status = Column(String, default="pending")  # e.g. "candidate, "pending", "in_progress", "completed", "skipped"
     retry_count = Column(Integer, default=0)  # number of times this beat has been retried

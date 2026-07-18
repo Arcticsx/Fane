@@ -16,9 +16,7 @@ def run_beats_phase(source_doc_id: str, session_id: str):
     candidate_beats = None
     final_beats = None
 
-    _step_beats_extract(source_doc_id, session_id)
-
-    candidate_beats = _step_beats_save_candidates(source_doc_id, session_id, candidate_beats)
+    candidate_beats = _step_beats_extract(source_doc_id, session_id)
 
     candidate_beats, final_beats = _step_beats_reduce(source_doc_id, session_id, candidate_beats, final_beats)
 
@@ -49,14 +47,30 @@ def _step_beats_extract(source_doc_id: str, session_id: str):
             total_pages = source_doc.total_pages
 
         windows = generate_page_windows(total_pages=total_pages, window_size=5, overlap=1)
-        candidate_beats = []
+        all_beats = []
         consecutive_failures = 0
 
         import time
         for start_page, end_page in windows:
+            beats = None
+            
+            with get_db() as db:
+                existing = (
+                    db.query(StoryBeat)
+                    .filter(
+                        StoryBeat.session_id == session_id,
+                        StoryBeat.source_document_id == source_doc_id,
+                        StoryBeat.window_start_page == start_page,
+                        StoryBeat.window_end_page == end_page,
+                    )
+                    .first()
+                )
+                if existing:
+                    print(f"[run_beats] Skipping extraction for pages {start_page}-{end_page} (already exists)", file=sys.stderr)
+                    continue
+            
             try:
                 beats = extract_beats_from_window(session_id, source_doc_id, start_page, end_page)
-                candidate_beats.extend(beats)
                 consecutive_failures = 0
             except Exception as e:
                 consecutive_failures += 1
@@ -67,66 +81,50 @@ def _step_beats_extract(source_doc_id: str, session_id: str):
                 if "connection refused" in str(e).lower() or "server disconnected" in str(e).lower():
                     print(f"[run_beats] Ollama unresponsive, backing off 15s", file=sys.stderr)
                     time.sleep(15)
-                    beats = extract_beats_from_window(session_id, source_doc_id, start_page, end_page)
-                    candidate_beats.extend(beats)
-                    consecutive_failures = 0
-                if consecutive_failures >= 5:
+                    try:
+                        beats = extract_beats_from_window(session_id, source_doc_id, start_page, end_page)
+                        consecutive_failures = 0
+                    except Exception as retry_e:
+                        print(f"[run_beats] Retry failed for pages {start_page}-{end_page}: {retry_e}", file=sys.stderr)
+
+                if beats is None and consecutive_failures >= 5:
                     raise RuntimeError(
                         f"Too many consecutive extraction failures ({consecutive_failures}); aborting"
                     )
-            finally:
-                time.sleep(3)
 
-        if not candidate_beats:
+            # Save this window's beats immediately, instead of waiting until the end
+            if beats:
+                try:
+                    save_candidate_beats(
+                        source_doc_id=source_doc_id,
+                        session_id=session_id,
+                        candidates=beats,
+                        window_start_page=start_page,
+                        window_end_page=end_page
+                    )
+                    all_beats.extend(beats)
+                except Exception as save_e:
+                    print(
+                        f"[run_beats] Error saving beats for pages {start_page}-{end_page}: {save_e}",
+                        file=sys.stderr,
+                    )
+                    raise
+
+            time.sleep(3)
+
+        if not all_beats:
             raise ValueError("No beats extracted")
 
         with get_db() as db:
             complete_step(db, session_id, phase, step)
+
+        return all_beats
 
     except Exception as e:
         with get_db() as db:
             fail_step(db, session_id, phase, step, e)
             _mark_source_failed(db, source_doc_id, e)
         print(f"[run_beats] Fatal error extracting beats for {source_doc_id}: {e}", file=sys.stderr)
-        raise
-
-
-def _step_beats_save_candidates(source_doc_id: str, session_id: str, candidate_beats: list | None):
-    phase = "story_beats"
-    step = "beats_save_candidates"
-
-    with get_db() as db:
-        if is_step_completed(db, session_id, phase, step):
-            return candidate_beats
-
-    if candidate_beats is None:
-        candidate_beats = _load_candidate_beats_from_db(session_id, source_doc_id)
-        if not candidate_beats:
-            _re_extract_beats(source_doc_id, session_id)
-
-    with get_db() as db:
-        try:
-            start_step(db, session_id, phase, step)
-        except Exception:
-            pass
-
-    try:
-        save_candidate_beats(
-            source_doc_id=source_doc_id,
-            session_id=session_id,
-            candidates=candidate_beats,
-        )
-
-        with get_db() as db:
-            complete_step(db, session_id, phase, step)
-
-        return candidate_beats
-
-    except Exception as e:
-        with get_db() as db:
-            fail_step(db, session_id, phase, step, e)
-            _mark_source_failed(db, source_doc_id, e)
-        print(f"[run_beats] Error saving candidate beats for {source_doc_id}: {e}", file=sys.stderr)
         raise
 
 

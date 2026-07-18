@@ -201,7 +201,7 @@ def sort_candidates(candidates: List[Dict[str, Any]]) -> List[Dict[str, Any]]:
     
     return sorted(candidates, key=get_sort_key)
 
-def save_candidate_beats(source_doc_id: str, session_id: str, candidates: list[dict]) -> int:
+def save_candidate_beats(source_doc_id: str, session_id: str, candidates: list[dict], window_start_page: int, window_end_page: int) -> int:
     
     if not candidates:
         return 0
@@ -222,6 +222,8 @@ def save_candidate_beats(source_doc_id: str, session_id: str, candidates: list[d
                     status="candidate",
                     starting_page=_coerce_int(c.get("start_page")),
                     ending_page=_coerce_int(c.get("end_page")),
+                    window_start_page=window_start_page,
+                    window_end_page=window_end_page,
                     classification = c.get("classification"),
                     characters = json.dumps(c.get("characters", [])),
                     beat_order = order,
