@@ -218,7 +218,7 @@ def _step_beats_reduce(source_doc_id, session_id, candidate_beats, final_beats):
         merged_beats.sort(key=lambda b: (b["start_page"], b.get("end_page", b["start_page"])))
         for i, beat in enumerate(merged_beats):
             beat["order"] = i
-
+        
         final_beats = merged_beats
 
         with get_db() as db:
