@@ -119,41 +119,104 @@ def _stub_client():
     return _StubClient()
 
 
+def _build_deepseek(model_name, schema):
+    kwargs = {
+        "model": model_name,
+        "api_key": API_KEY,
+        "base_url": "https://api.deepseek.com",
+        "temperature": 0,
+    }
+    if schema is not None:
+        kwargs["format"] = schema
+    return ChatOpenAI(**kwargs)
+
+
+def _build_ollama(model_name, schema):
+    from langchain_ollama import ChatOllama
+
+    if model_name and ":" in model_name:
+        model_name = model_name.split(":", 1)[1]
+
+    kwargs = {
+        "model": model_name,
+        "base_url": "http://localhost:11434",
+        "temperature": 0,
+    }
+    if schema is not None:
+        kwargs["num_ctx"] = 8192
+        kwargs["format"] = schema
+    return ChatOllama(**kwargs)
+
+
+def _build_anthropic(model_name, schema):
+    from langchain_anthropic import ChatAnthropic
+
+    kwargs = {
+        "model": model_name,
+        "api_key": API_KEY,
+        "temperature": 0,
+    }
+    if schema is not None:
+        kwargs["format"] = schema  # confirm langchain_anthropic supports this kwarg before relying on it
+    return ChatAnthropic(**kwargs)
+
+
+def _build_openai(model_name, schema):
+    kwargs = {
+        "model": model_name,
+        "api_key": API_KEY,
+        "temperature": 0,
+    }
+    if schema is not None:
+        kwargs["format"] = schema
+    return ChatOpenAI(**kwargs)
+
+def _build_gemini(model_name, schema):
+    from langchain_google_genai import ChatGoogleGenerativeAI
+
+    kwargs = {
+        "model": model_name,
+        "google_api_key": API_KEY,
+        "temperature": 0,
+    }
+    if schema is not None:
+        kwargs["response_schema"] = schema  # ChatGoogleGenerativeAI uses response_schema, not format
+        kwargs["response_mime_type"] = "application/json"
+    return ChatGoogleGenerativeAI(**kwargs)
+
+
+def _build_grok(model_name, schema):
+    kwargs = {
+        "model": model_name,
+        "api_key": API_KEY,
+        "base_url": "https://api.x.ai/v1",
+        "temperature": 0,
+    }
+    if schema is not None:
+        kwargs["format"] = schema
+    return ChatOpenAI(**kwargs)
+
+
+PROVIDER_BUILDERS = {
+    "deepseek": _build_deepseek,
+    "ollama": _build_ollama,
+    "anthropic": _build_anthropic,
+    "openai": _build_openai,
+    "gemini": _build_gemini,
+    "grok": _build_grok,
+}
+
+
 def get_client(mode, type=None):
     schema = _get_schema(mode, type)
+    builder = PROVIDER_BUILDERS.get(PROVIDER)
 
-    try:
-        if PROVIDER == "deepseek":
-            kwargs = {
-                "model": AISUITE_MODEL,
-                "api_key": API_KEY,
-                "base_url": "https://api.deepseek.com",
-                "temperature": 0,
-            }
-            if schema is not None:
-                kwargs["format"] = schema
-            return ChatOpenAI(**kwargs)
-
-        elif PROVIDER == "ollama":
-            from langchain_ollama import ChatOllama
-
-            model_name = AISUITE_MODEL
-            if model_name and ":" in model_name:
-                model_name = model_name.split(":", 1)[1]
-
-            kwargs = {
-                "model": model_name,
-                "base_url": "http://localhost:11434",
-                "temperature": 0,
-            }
-            if schema is not None:
-                kwargs["num_ctx"] = 8192
-                kwargs["format"] = schema
-            return ChatOllama(**kwargs)
-
-    except Exception as e:
-        print(f"[Warning] {PROVIDER} client init failed: {e}")
-        # fall through to stub
+    if builder is not None:
+        try:
+            return builder(AISUITE_MODEL, schema)
+        except Exception as e:
+            print(f"[Warning] {PROVIDER} client init failed: {e}")
+            # fall through to stub
 
     return _stub_client()
 
