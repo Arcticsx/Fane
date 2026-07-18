@@ -19,8 +19,6 @@ def run_documents_phase(source_doc_id: str, session_id: str):
 
     _step_metadata_extraction(source_doc_id, session_id, temp_path)
     _step_chapter_extraction(source_doc_id, session_id, temp_path)
-    _step_chunking(source_doc_id, session_id, temp_path)
-    _step_embedding(source_doc_id, session_id, temp_path)
     _step_vector_storage(source_doc_id, session_id, temp_path, filename)
 
 
