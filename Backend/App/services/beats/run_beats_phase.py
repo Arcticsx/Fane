@@ -5,9 +5,8 @@ from ..utility.getdb import get_db
 from ..utility.status import is_step_completed, start_step, complete_step, fail_step
 from ...models.rpg_sessions import SourceDocument, StoryBeat
 from ..documents.documents import generate_page_windows
-from .extraction import extract_beats_from_window, save_candidate_beats, replace_candidates_with_final_beats
-from .beats_reduce import split_and_reduce
-from .extraction import cluster_candidates, reduce_cluster, merge_clusters, global_polish
+from .extraction import extract_beats_from_window, save_candidate_beats, replace_candidates_with_final_beats, save_reduced_beats
+from .extraction import chunk_candidates_by_budget, reduce_cluster, merge_clusters
 from .graph import build_beat_graph, persist_beat_graph
 
 
@@ -63,11 +62,26 @@ def _step_beats_extract(source_doc_id: str, session_id: str):
                         StoryBeat.window_start_page == start_page,
                         StoryBeat.window_end_page == end_page,
                     )
-                    .first()
+                    .all()
                 )
                 if existing:
                     print(f"[run_beats] Skipping extraction for pages {start_page}-{end_page} (already exists)", file=sys.stderr)
-                    continue
+                    all_beats.append(
+                        [{
+                        "beat_type": beats.beat_type,
+                        "description": beats.description,
+                        "start_page": beats.starting_page,
+                        "end_page": beats.ending_page,
+                        "classification": beats.classification,
+                        "characters": json.loads(beats.characters) if beats.characters else [],
+                        "requires": json.loads(beats.requires) if beats.requires else [],
+                        "introduces": json.loads(beats.introduces) if beats.introduces else [],
+                        "key_dialogues": json.loads(beats.key_dialogues) if beats.key_dialogues else
+                        [],
+                    } 
+                        for beats in existing
+                    
+                    ])
             
             try:
                 beats = extract_beats_from_window(session_id, source_doc_id, start_page, end_page)
@@ -78,19 +92,9 @@ def _step_beats_extract(source_doc_id: str, session_id: str):
                     f"[run_beats] Error extracting pages {start_page}-{end_page}: {e}",
                     file=sys.stderr,
                 )
-                if "connection refused" in str(e).lower() or "server disconnected" in str(e).lower():
-                    print(f"[run_beats] Ollama unresponsive, backing off 15s", file=sys.stderr)
-                    time.sleep(15)
-                    try:
-                        beats = extract_beats_from_window(session_id, source_doc_id, start_page, end_page)
-                        consecutive_failures = 0
-                    except Exception as retry_e:
-                        print(f"[run_beats] Retry failed for pages {start_page}-{end_page}: {retry_e}", file=sys.stderr)
-
-                if beats is None and consecutive_failures >= 5:
-                    raise RuntimeError(
-                        f"Too many consecutive extraction failures ({consecutive_failures}); aborting"
-                    )
+                
+                if consecutive_failures >= 3:
+                    raise RuntimeError(f"Failed to extract beats for 3 consecutive windows, last error: {e}")
 
             # Save this window's beats immediately, instead of waiting until the end
             if beats:
@@ -128,18 +132,28 @@ def _step_beats_extract(source_doc_id: str, session_id: str):
         raise
 
 
-def _step_beats_reduce(source_doc_id: str, session_id: str, candidate_beats: list | None, final_beats: list | None):
+def _step_beats_reduce(source_doc_id, session_id, candidate_beats, final_beats):
     phase = "story_beats"
     step = "beats_reduce"
 
     with get_db() as db:
         if is_step_completed(db, session_id, phase, step):
-            return candidate_beats, final_beats
+            final_beats = merge_clusters(
+                db.query(StoryBeat)
+                .filter(StoryBeat.session_id == session_id, StoryBeat.status == "reduced")
+                .order_by(StoryBeat.beat_order)
+                .all()
+            )
+            final_beats.sort(key=lambda b: (b["start_page"], b.get("end_page", b["start_page"])))
+            for i, beat in enumerate(final_beats):
+                beat["order"] = i
+                
+            return final_beats
 
     if candidate_beats is None:
         candidate_beats = _load_candidate_beats_from_db(session_id, source_doc_id)
-    if not candidate_beats:
-        raise ValueError("No candidate beats available for reduction")
+        if not candidate_beats:
+            raise ValueError("No candidate beats available for reduction")
 
     with get_db() as db:
         try:
@@ -148,15 +162,63 @@ def _step_beats_reduce(source_doc_id: str, session_id: str, candidate_beats: lis
             pass
 
     try:
-        clusters = cluster_candidates(candidate_beats)
-        reduced_clusters = split_and_reduce(
-            clusters, reduce_cluster,
-            token_budget=4000, chars_per_token=4, format_fn=json.dumps,
+        chunks = chunk_candidates_by_budget(
+            candidate_beats,
+            token_budget=4000,
+            chars_per_token=4,
+            overlap_count=3,
+            format_fn=json.dumps,
         )
+        
+        reduced_clusters = []
+
+        for i, chunk in enumerate(chunks):
+            window_start_page = min(c.get("start_page", float('inf')) for c in chunk)
+            window_end_page = max(c.get("end_page", float('-inf')) for c in chunk)
+
+            existing_reduced = (
+                db.query(StoryBeat)
+                .filter(
+                    StoryBeat.session_id == session_id,
+                    StoryBeat.source_document_id == source_doc_id,
+                    StoryBeat.status == "reduced",
+                    StoryBeat.window_start_page == window_start_page,
+                    StoryBeat.window_end_page == window_end_page,
+                )
+                .order_by(StoryBeat.beat_order)
+                .all()
+            )
+            if existing_reduced:
+                reduced_clusters.append(
+                    [
+                        {
+                            "beat_type": beat.beat_type,
+                            "description": beat.description,
+                            "start_page": beat.starting_page,
+                            "end_page": beat.ending_page,
+                            "classification": beat.classification,
+                            "characters": json.loads(beat.characters) if beat.characters else [],
+                            "requires": json.loads(beat.requires) if beat.requires else [],
+                            "introduces": json.loads(beat.introduces) if beat.introduces else [],
+                            "key_dialogues": json.loads(beat.key_dialogues) if beat.key_dialogues else [],
+                            "order": beat.beat_order,
+                        }
+                        for beat in existing_reduced
+                    ]
+                )
+                continue
+
+            print(f"[run_beats] Reducing chunk {i+1}/{len(chunks)} with {len(chunk)} candidates")
+            reduced = reduce_cluster(chunk)
+            reduced_clusters.append(reduced)
+            save_reduced_beats(source_doc_id, session_id, reduced, window_start_page, window_end_page)
+            
         merged_beats = merge_clusters(reduced_clusters)
+
+        merged_beats.sort(key=lambda b: (b["start_page"], b.get("end_page", b["start_page"])))
         for i, beat in enumerate(merged_beats):
             beat["order"] = i
-        merged_beats.sort(key=lambda b: b["order"])
+
         final_beats = merged_beats
 
         with get_db() as db:
@@ -181,18 +243,38 @@ def _step_beats_save_reduced(source_doc_id: str, session_id: str, final_beats: l
             return
 
     if final_beats is None:
-        candidate_beats = _load_candidate_beats_from_db(session_id, source_doc_id)
-        if not candidate_beats:
-            raise ValueError("No candidate beats available for re-reduction")
-        clusters = cluster_candidates(candidate_beats)
-        reduced_clusters = split_and_reduce(
-            clusters, reduce_cluster,
-            token_budget=4000, chars_per_token=4, format_fn=json.dumps,
-        )
-        final_beats = merge_clusters(reduced_clusters)
+        with get_db() as db:
+            reduced_rows = (
+                db.query(StoryBeat)
+                .filter(
+                    StoryBeat.session_id == session_id,
+                    StoryBeat.source_document_id == source_doc_id,
+                    StoryBeat.status == "reduced",
+                )
+                .order_by(StoryBeat.beat_order)
+                .all()
+            )
+            final_beats = merge_clusters([
+                [
+                    {
+                        "beat_type": row.beat_type,
+                        "description": row.description,
+                        "start_page": row.starting_page,
+                        "end_page": row.ending_page,
+                        "classification": row.classification,
+                        "characters": json.loads(row.characters) if row.characters else [],
+                        "requires": json.loads(row.requires) if row.requires else [],
+                        "introduces": json.loads(row.introduces) if row.introduces else [],
+                        "key_dialogues": json.loads(row.key_dialogues) if row.key_dialogues else [],
+                        "order": row.beat_order,
+                    }
+                    for row in reduced_rows
+                ]
+            ])
+        final_beats.sort(key=lambda b: (b["start_page"], b.get("end_page", b["start_page"])))
         for i, beat in enumerate(final_beats):
             beat["order"] = i
-        final_beats.sort(key=lambda b: b["order"])
+        
 
     with get_db() as db:
         try:

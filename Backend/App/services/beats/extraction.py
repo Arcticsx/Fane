@@ -245,21 +245,80 @@ def save_candidate_beats(source_doc_id: str, session_id: str, candidates: list[d
  
     return saved
 
-def cluster_candidates(candidates: List[Dict], cluster_size: int = 18, overlap: int = 5) -> List[List[Dict]]:
+def save_reduced_beats(source_doc_id: str, session_id: str, reduced_beats: list[dict], window_start_page: int, window_end_page: int) -> int:
     
-    sorted_candidates = sort_candidates(candidates)  # uses (start_page, end_page, order)
+    if not reduced_beats:
+        return 0
+
     
-    clusters = []
-    i = 0
-    n = len(sorted_candidates)
-    while i < n:
-        cluster = sorted_candidates[i : i + cluster_size]
-        clusters.append(cluster)
-        # Move i forward by cluster_size - overlap (so next cluster overlaps)
-        i += cluster_size - overlap
-        if i >= n:
-            break
-    return clusters
+    
+    saved = 0
+    with get_db() as db:
+        try:
+            for order, c in enumerate(reduced_beats):
+                if not isinstance(c, dict):
+                    continue
+
+                beat = StoryBeat(
+                    session_id=session_id,
+                    source_document_id=source_doc_id,
+                    beat_type=c.get("beat_type"),
+                    description=c.get("description"),
+                    status="reduced",
+                    starting_page=_coerce_int(c.get("start_page")),
+                    ending_page=_coerce_int(c.get("end_page")),
+                    window_start_page=window_start_page,
+                    window_end_page=window_end_page,
+                    classification = c.get("classification"),
+                    characters = json.dumps(c.get("characters", [])),
+                    beat_order = order,
+                    requires=json.dumps(c.get("requires", [])),
+                    introduces=json.dumps(c.get("introduces", [])),
+                    key_dialogues=json.dumps(c.get("key_dialogues", [])),
+                )
+                db.add(beat)
+                saved += 1
+    
+            db.commit()
+        except Exception as e:
+            db.rollback()
+            print(f"[extraction.save_reduced_beats] Failed to save reduced beats for {source_doc_id}: {e}", file=sys.stderr)
+            raise
+        finally:
+            db.close()
+ 
+    return saved
+
+def chunk_candidates_by_budget(candidates, token_budget=4000, chars_per_token=4, overlap_count=3, format_fn=json.dumps):
+    """
+    Single-pass windowing: packs sorted candidates into chunks bounded by
+    char budget, carrying the last `overlap_count` candidates from each
+    chunk forward into the next so reduce_beats() has boundary context.
+    """
+    char_budget = token_budget * chars_per_token
+    sorted_candidates = sort_candidates(candidates)
+
+    chunks = []
+    current = []
+    current_len = 0
+
+    for candidate in sorted_candidates:
+        candidate_len = len(format_fn(candidate))
+
+        if current and current_len + candidate_len > char_budget:
+            chunks.append(current)
+            # seed next chunk with trailing overlap for continuity
+            carry = current[-overlap_count:] if overlap_count else []
+            current = list(carry)
+            current_len = sum(len(format_fn(c)) for c in current)
+
+        current.append(candidate)
+        current_len += candidate_len
+
+    if current:
+        chunks.append(current)
+
+    return chunks
 
 def reduce_cluster(cluster: List[Dict]) -> List[Dict]:
 
@@ -498,9 +557,10 @@ def replace_candidates_with_final_beats(
         deleted = db.query(StoryBeat).filter(
             StoryBeat.session_id == session_id,
             StoryBeat.source_document_id == source_doc_id,
-            StoryBeat.status == "candidate"
+            StoryBeat.status == "candidate" or StoryBeat.status == "reduced"
         ).delete(synchronize_session=False)
-        print(f"Deleted {deleted} candidate beats for {source_doc_id}")
+        print(f"Deleted {deleted} candidate and reduced beats for {source_doc_id}")
+        
 
         inserted = 0
         skipped = 0
