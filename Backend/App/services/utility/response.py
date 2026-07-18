@@ -1,8 +1,6 @@
-# Handles all LLM API calls via LangChain, with retry logic
-
 import time
 from langchain_openai import ChatOpenAI
-
+from concurrent.futures import ThreadPoolExecutor, TimeoutError as FutureTimeoutError
 from .config import AISUITE_MODEL, PROVIDER, API_KEY
 
 BEAT_SCHEMA = {
@@ -228,7 +226,9 @@ def get_client(mode, type):
     return _StubClient()
 
 
-def get_response(prompt, mode, type, retries=3, backoff=2):
+
+def get_response(prompt, mode, type=None, retries=3, backoff=2, response_timeout=15):
+
     client = get_client(mode, type)
     last_error = None
 
@@ -243,7 +243,14 @@ def get_response(prompt, mode, type, retries=3, backoff=2):
 
     for attempt in range(1, retries + 1):
         try:
-            response = client.invoke(prompt)
+            with ThreadPoolExecutor(max_workers=1) as executor:
+                future = executor.submit(client.invoke, prompt)
+                try:
+                    response = future.result(timeout=response_timeout)
+                except FutureTimeoutError:
+                    raise TimeoutError(
+                        f"No response after {response_timeout}s cooldown"
+                    )
 
             if not response.content:
                 raise ValueError(

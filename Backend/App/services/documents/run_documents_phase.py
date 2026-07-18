@@ -19,8 +19,6 @@ def run_documents_phase(source_doc_id: str, session_id: str):
 
     _step_metadata_extraction(source_doc_id, session_id, temp_path)
     _step_chapter_extraction(source_doc_id, session_id, temp_path)
-    _step_chunking(source_doc_id, session_id, temp_path)
-    _step_embedding(source_doc_id, session_id, temp_path)
     _step_vector_storage(source_doc_id, session_id, temp_path, filename)
 
 
@@ -109,79 +107,6 @@ def _step_chapter_extraction(source_doc_id: str, session_id: str, temp_path: str
             fail_step(db, session_id, phase, phase, e)
         print(f"[run_documents] Error extracting chapters for {temp_path}: {e}", file=sys.stderr)
         raise
-
-
-def _step_chunking(source_doc_id: str, session_id: str, temp_path: str):
-    phase = "chunking"
-    with get_db() as db:
-        if is_step_completed(db, session_id, phase, phase):
-            return
-
-    with get_db() as db:
-        try:
-            start_step(db, session_id, phase, phase)
-        except Exception:
-            pass
-
-    try:
-        print(f"[run_documents] Chunking document: {temp_path}")
-        chunks = chunk_document(temp_path, chunksize=500, overlap=50)
-
-        if not chunks:
-            raise ValueError("No content extracted during chunking")
-
-        with get_db() as db:
-            source_doc = db.query(SourceDocument).filter(SourceDocument.id == source_doc_id).first()
-            if source_doc:
-                source_doc.chunk_count = len(chunks)
-                source_doc.status = "processing"
-                source_doc.last_heartbeat = datetime.now(timezone.utc)
-                db.commit()
-            print(f"[run_documents] Chunked into {len(chunks)} chunks")
-
-        with get_db() as db:
-            complete_step(db, session_id, phase, phase)
-
-    except Exception as e:
-        with get_db() as db:
-            fail_step(db, session_id, phase, phase, e)
-        print(f"[run_documents] Error chunking document {temp_path}: {e}", file=sys.stderr)
-        raise
-
-
-def _step_embedding(source_doc_id: str, session_id: str, temp_path: str):
-    phase = "embedding"
-    with get_db() as db:
-        if is_step_completed(db, session_id, phase, phase):
-            return
-
-    with get_db() as db:
-        try:
-            start_step(db, session_id, phase, phase)
-        except Exception:
-            pass
-
-    try:
-        chunks = chunk_document(temp_path, chunksize=500, overlap=50)
-        if not chunks:
-            raise ValueError("No content extracted for embedding")
-
-        print(f"[run_documents] Generating embeddings for {len(chunks)} chunks")
-        embeddings = embed_chunks(chunks)
-
-        with get_db() as db:
-            complete_step(db, session_id, phase, phase)
-
-    except Exception as e:
-        with get_db() as db:
-            fail_step(db, session_id, phase, phase, e)
-            source_doc = db.query(SourceDocument).filter(SourceDocument.id == source_doc_id).first()
-            if source_doc:
-                source_doc.error_message = str(e)[:1000]
-                db.commit()
-        print(f"[run_documents] Error creating embeddings for {source_doc_id}: {e}", file=sys.stderr)
-        raise
-
 
 def _step_vector_storage(source_doc_id: str, session_id: str, temp_path: str, filename: str):
     phase = "vector_storage"

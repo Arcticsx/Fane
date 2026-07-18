@@ -10,12 +10,10 @@ PIPELINE_PHASES = [
     ("document_upload",        0),
     ("metadata_extraction",    1),
     ("chapter_extraction",     2),
-    ("chunking",               3),
-    ("embedding",              4),
-    ("vector_storage",         5),
-    ("story_beats",            6),
-    ("entity_extraction",      7),
-    ("character_processing",   8),
+    ("vector_storage",         3),
+    ("story_beats",            4),
+    ("entity_extraction",      5),
+    ("character_processing",   6),
 ]
 
 PHASE_STEPS = {
@@ -35,8 +33,7 @@ PHASE_STEPS = {
         ("characters_classify",    800),
         ("characters_persist",     801),
         ("characters_segment",     802),
-        ("characters_arc_llm",     803),
-        ("characters_arc_persist", 804),
+        ("characters_arc",     803),
     ],
 }
 
@@ -128,20 +125,13 @@ def start_step(db, session_id, phase, step_name):
 
 
 def complete_step(db, session_id, phase, step_name):
-    ps = db.query(ProcessStatus).filter_by(session_id=session_id, phase=phase).first()
-    if ps:
-        ps.status = "completed"
-        ps.completed_at = _now()
-
     step = db.query(ProcessStep).filter_by(session_id=session_id, phase=phase, step=step_name).first()
     if step:
         step.status = "completed"
         step.completed_at = _now()
     db.commit()
 
-    # Check if all steps in this phase are completed
-    if phase in PHASE_STEPS:
-        _sync_phase_status_from_steps(db, session_id, phase)
+    _sync_phase_status_from_steps(db, session_id, phase)
 
 
 def _sync_phase_status_from_steps(db, session_id, phase):
