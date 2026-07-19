@@ -66,7 +66,7 @@ def _step_beats_extract(source_doc_id: str, session_id: str):
                 )
                 if existing:
                     print(f"[run_beats] Skipping extraction for pages {start_page}-{end_page} (already exists)", file=sys.stderr)
-                    all_beats.append(
+                    all_beats.extend(
                         [{
                         "beat_type": beats.beat_type,
                         "description": beats.description,
@@ -78,10 +78,11 @@ def _step_beats_extract(source_doc_id: str, session_id: str):
                         "introduces": json.loads(beats.introduces) if beats.introduces else [],
                         "key_dialogues": json.loads(beats.key_dialogues) if beats.key_dialogues else
                         [],
-                    } 
+                        } 
                         for beats in existing
-                    
-                    ])
+                        ]
+                    )
+                    continue
             
             try:
                 beats = extract_beats_from_window(session_id, source_doc_id, start_page, end_page)
@@ -189,6 +190,7 @@ def _step_beats_reduce(source_doc_id, session_id, candidate_beats, final_beats):
                 .all()
             )
             if existing_reduced:
+                print(f"[run_beats] Skipping reduction for pages {window_start_page}-{window_end_page} (already reduced)", file=sys.stderr)
                 reduced_clusters.append(
                     [
                         {
@@ -218,7 +220,7 @@ def _step_beats_reduce(source_doc_id, session_id, candidate_beats, final_beats):
         merged_beats.sort(key=lambda b: (b["start_page"], b.get("end_page", b["start_page"])))
         for i, beat in enumerate(merged_beats):
             beat["order"] = i
-        
+
         final_beats = merged_beats
 
         with get_db() as db:

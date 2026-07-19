@@ -19,10 +19,9 @@ PIPELINE_PHASES = [
 PHASE_STEPS = {
     "story_beats": [
         ("beats_extract",         600),
-        ("beats_save_candidates", 601),
-        ("beats_reduce",          602),
-        ("beats_save_reduced",    603),
-        ("beats_graph",           604),
+        ("beats_reduce",          601),
+        ("beats_save_reduced",    602),
+        ("beats_graph",           603),
     ],
     "entity_extraction": [
         ("entities_extract",      700),
@@ -129,6 +128,7 @@ def complete_step(db, session_id, phase, step_name):
     if step:
         step.status = "completed"
         step.completed_at = _now()
+        step.error = None
     db.commit()
 
     _sync_phase_status_from_steps(db, session_id, phase)
