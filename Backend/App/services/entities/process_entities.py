@@ -1,6 +1,8 @@
 import sys
 import time
 
+from Backend.App.models.rpg_sessions import Entities
+
 from ..utility.response import get_response
 from ..beats.extraction import _assemble_pages_text, _parse_json_response
 from ..documents.vectorstore import query_chroma_by_page_range
@@ -143,6 +145,32 @@ def extract_entities_from_window(session_id, start_page, end_page):
     normalized = [e for e in normalized if e is not None]
     return normalized
   
+def store_candidate_entities(session_id, candidate_entities, window_start_page, window_end_page, db):
+    
+    for entity in candidate_entities:
+        if not isinstance(entity, dict):
+            print(f"[process_entities.store_candidate_entities] Invalid entity format: {entity!r}", file=sys.stderr)
+            continue
+
+        name = entity.get("name")
+        entity_type = entity.get("type")
+        pages = entity.get("pages")
+
+        start_page = min(pages) if pages else window_start_page
+        end_page = max(pages) if pages else window_end_page
+
+
+        new_entity = Entities(
+            session_id=session_id,
+            name=name,
+            type=entity_type,
+            window_start_page=window_start_page,
+            window_end_page=window_end_page,
+            pages = pages
+        )
+        db.add(new_entity)
+    db.commit()
+    return True
 
 def seperate_candidates(candidate_entities):
     """

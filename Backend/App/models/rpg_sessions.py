@@ -170,6 +170,23 @@ class ChronicleChapter(Base):
             f"number={self.number} closed={self.is_closed}>"
         )
 
+class Entities(Base):
+    __tablename__ = "entities"
+
+    id = Column(String, primary_key=True, default=_uuid)
+    session_id = Column(String, ForeignKey("rpg_sessions.id", ondelete="CASCADE"), nullable=False)
+    name = Column(String, nullable=False)
+    entity_type = Column(String, nullable=False)  # e.g., "character", "lore_entry", "story_event"
+    pages = Column(JSON, nullable=True)  # list of page numbers where the entity appears
+    window_start_page = Column(Integer, nullable=True)
+    window_end_page = Column(Integer, nullable=True)
+    source_document_id = Column(String, ForeignKey("source_document.id", ondelete="SET NULL"), nullable=True)
+    description_md = Column(Text, nullable=True)
+    created_at = Column(DateTime(timezone=True), default=_now, nullable=False)
+
+    session = relationship("RpgSession", back_populates="entities")
+    source_document = relationship("SourceDocument", back_populates="entities")
+
 
 class Character(Base):
     __tablename__ = "character"

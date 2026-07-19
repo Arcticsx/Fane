@@ -4,9 +4,9 @@ import time
 from ..utility.getdb import get_db
 from ..utility.response import get_response
 from ..utility.status import is_step_completed, start_step, complete_step, fail_step
-from ...models.rpg_sessions import SourceDocument, Character, CharacterSegment, CharacterArcState, ChronicleChapter
+from ...models.rpg_sessions import Entities, SourceDocument, Character, CharacterSegment, CharacterArcState, ChronicleChapter
 from ..documents.documents import generate_page_windows
-from .process_entities import extract_entities_from_window, span_construction, seperate_candidates
+from .process_entities import extract_entities_from_window, span_construction, seperate_candidates, store_candidate_entities
 from .entities_reduce import merge_entity_clusters
 from .process_characters import (
     rank_characters,
@@ -93,7 +93,8 @@ def _step_entities_extract(source_doc_id: str, session_id: str):
 
     with get_db() as db:
         if is_step_completed(db, session_id, phase, step):
-            return None
+            entities = db.query(Entities).filter(Entities.session_id == session_id).all()
+            return [e.to_dict() for e in entities]
 
     with get_db() as db:
         try:
@@ -106,22 +107,43 @@ def _step_entities_extract(source_doc_id: str, session_id: str):
         windows = generate_page_windows(total_pages=total_pages, window_size=5, overlap=1)
         candidate_entities = []
         consecutive_failures = 0
+        
 
         for start_page, end_page in windows:
-            try:
-                entities = extract_entities_from_window(session_id, start_page, end_page)
-                candidate_entities.append(entities)
-                consecutive_failures = 0
-            except Exception as e:
-                        consecutive_failures += 1
-                        print(f"[run_entities] Error extracting pages {start_page}-{end_page}: {e}", file=sys.stderr)
+            with get_db() as db:
+                exists = db.query(Entities).filter(
+                    Entities.session_id == session_id,
+                    Entities.window_start_page == start_page,
+                    Entities.window_end_page == end_page
+                ).all()
+                
+                if exists:
+                    print(f"[run_entities] Entities already exist for pages {start_page}-{end_page}, skipping extraction", file=sys.stderr)
+                    for e in exists:
+                        candidate_entities.append({
+                            "name": e.name,
+                            "type": e.type,
+                            "pages": e.pages
+                        })
+                    continue
+                
+                try:
+                    entities = extract_entities_from_window(session_id, start_page, end_page)
+                    
+                    store_candidate_entities(session_id = session_id, candidate_entities=entities, window_start_page=start_page, window_end_page=end_page, db = db)
+                    
+                    candidate_entities.append(entities)
+                    consecutive_failures = 0
+                except Exception as e:
+                            consecutive_failures += 1
+                            print(f"[run_entities] Error extracting pages {start_page}-{end_page}: {e}", file=sys.stderr)
 
-                        if consecutive_failures >= 5:
-                            raise RuntimeError(
-                                f"Too many consecutive extraction failures ({consecutive_failures}); aborting"
-                            )
-            finally:
-                time.sleep(3)
+                            if consecutive_failures >= 5:
+                                raise RuntimeError(
+                                    f"Too many consecutive extraction failures ({consecutive_failures}); aborting"
+                                )
+                finally:
+                    time.sleep(3)
 
         with get_db() as db:
             complete_step(db, session_id, phase, step)
@@ -145,7 +167,7 @@ def _step_entities_merge(source_doc_id: str, session_id: str, candidate_entities
             return None
 
     if candidate_entities is None:
-        candidate_entities, _, _, _ = _re_extract_entities(source_doc_id, session_id)
+        candidate_entities = db.query(Entities).filter(Entities.session_id == session_id).all()
 
     with get_db() as db:
         try:
@@ -178,7 +200,7 @@ def _step_entities_separate(source_doc_id: str, session_id: str, merged_entities
             return None, None
 
     if merged_entities is None:
-        _, merged_entities, _, _ = _re_extract_entities(source_doc_id, session_id)
+        merged_entities = _step_entities_merge(source_doc_id, session_id, None)
 
     with get_db() as db:
         try:
@@ -224,8 +246,7 @@ def _step_characters_classify(source_doc_id: str, session_id: str, characters: l
             return None
 
     if characters is None:
-        _, _, characters, _ = _re_extract_entities(source_doc_id, session_id)
-
+        characters = _step_entities_separate(source_doc_id, session_id, None)[0]
     with get_db() as db:
         try:
             start_step(db, session_id, phase, step)
@@ -265,15 +286,7 @@ def _step_characters_persist(source_doc_id: str, session_id: str, spanned_charac
             return
 
     if spanned_characters is None:
-        _, _, characters, _ = _re_extract_entities(source_doc_id, session_id)
-        with get_db() as db:
-            source_document = db.query(SourceDocument).filter(SourceDocument.id == source_doc_id).first()
-            book_total_pages = source_document.total_pages if source_document else 0
-        ranked = rank_characters(characters)
-        spanned_characters = []
-        for character in ranked:
-            span_stats = span_statistic_of_character(character, book_total_pages)
-            spanned_characters.append(span_stats)
+        spanned_characters = _step_characters_classify(source_doc_id, session_id, None)
 
     with get_db() as db:
         try:
@@ -308,15 +321,7 @@ def _step_characters_segment(source_doc_id: str, session_id: str, spanned_charac
             return
 
     if spanned_characters is None:
-        _, _, characters, _ = _re_extract_entities(source_doc_id, session_id)
-        with get_db() as db:
-            source_document = db.query(SourceDocument).filter(SourceDocument.id == source_doc_id).first()
-            book_total_pages = source_document.total_pages if source_document else 0
-        ranked = rank_characters(characters)
-        spanned_characters = []
-        for character in ranked:
-            span_stats = span_statistic_of_character(character, book_total_pages)
-            spanned_characters.append(span_stats)
+        spanned_characters = _step_characters_classify(source_doc_id, session_id, None)
 
     with get_db() as db:
         try:
