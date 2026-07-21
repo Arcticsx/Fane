@@ -49,8 +49,14 @@ def run_entities_phase(source_doc_id: str, session_id: str):
     _step_characters_arc_llm(source_doc_id, session_id)
     
     spanned_lore = _step_lore_classify(source_doc_id, session_id, lore)
+    
     _step_lore_persist(source_doc_id, session_id, spanned_lore)
+    
     _step_lore_segment(source_doc_id, session_id, spanned_lore)
+    
+    _step_lore_arc_llm(source_doc_id, session_id)
+    
+    
 
 
 def _get_source_doc_total_pages(source_doc_id: str):
@@ -282,7 +288,6 @@ def _step_characters_classify(source_doc_id: str, session_id: str, characters: l
         print(f"[run_entities] Error classifying characters for {source_doc_id}: {e}", file=sys.stderr)
         raise
 
-
 def _step_characters_persist(source_doc_id: str, session_id: str, spanned_characters: list | None):
     phase = "character_processing"
     step = "characters_persist"
@@ -316,7 +321,6 @@ def _step_characters_persist(source_doc_id: str, session_id: str, spanned_charac
             _mark_source_failed(db, source_doc_id, e)
         print(f"[run_entities] Error persisting characters for {source_doc_id}: {e}", file=sys.stderr)
         raise
-
 
 def _step_characters_segment(source_doc_id: str, session_id: str, spanned_characters: list | None):
     phase = "character_processing"
@@ -355,7 +359,6 @@ def _step_characters_segment(source_doc_id: str, session_id: str, spanned_charac
         print(f"[run_entities] Error segmenting characters for {source_doc_id}: {e}", file=sys.stderr)
         raise
 
-
 def _step_characters_arc_llm(source_doc_id: str, session_id: str):
     phase = "character_processing"
     step = "characters_arc"
@@ -382,8 +385,6 @@ def _step_characters_arc_llm(source_doc_id: str, session_id: str):
             _mark_source_failed(db, source_doc_id, e)
         print(f"[run_entities] Error running arc LLM for {source_doc_id}: {e}", file=sys.stderr)
         raise
-
-
 
 def _run_arc_llm_for_session(session_id: str):
     with get_db() as db:
@@ -448,7 +449,6 @@ def _run_arc_llm_for_session(session_id: str):
                     db.add(arc_record)
                     db.commit()
                     print(f"[run_entities] Saved arc state for {character_name} segment {segment.segment_number}", file=sys.stderr)
-
 
 def _step_lore_classify(source_doc_id: str, session_id: str, lore: list | None):
     phase = "lore_processing"
@@ -518,12 +518,13 @@ def _step_lore_persist(source_doc_id: str, session_id: str, classified_lore: lis
             _mark_source_failed(db, source_doc_id, e)
             print(f"[run_entities] Error persisting lore for {source_doc_id}: {e}", file=sys.stderr)
             raise
-
+        
 def _step_lore_segment(source_doc_id: str, session_id: str, classified_lore: list | None):
     phase = "lore_processing"
     step = "lore_segment"
 
     with get_db() as db:
+        
         if is_step_completed(db, session_id, phase, step):
             return
 
@@ -535,8 +536,7 @@ def _step_lore_segment(source_doc_id: str, session_id: str, classified_lore: lis
         except Exception:
             pass
 
-        try:
-            
+        try:      
             total_chapters = len(
                 db.query(ChronicleChapter).filter(ChronicleChapter.session_id == session_id).all()
             )
@@ -554,3 +554,9 @@ def _step_lore_segment(source_doc_id: str, session_id: str, classified_lore: lis
             _mark_source_failed(db, source_doc_id, e)
             print(f"[run_entities] Error segmenting lore for {source_doc_id}: {e}", file=sys.stderr)
             raise
+
+def _step_lore_arc_llm(source_doc_id: str, session_id: str):
+    phase = "lore_processing"
+    step = "lore_arc"
+    
+    

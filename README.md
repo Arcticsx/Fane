@@ -1,167 +1,88 @@
-﻿# fane -- Local AI Conversational App
+﻿# Fane -- Local AI Conversational App
 
-A CLI and web application for immersive roleplay conversations with AI-powered characters. It supports multiple LLM providers (OpenAI, Anthropic Claude, Ollama, and DeepSeek), persistent sessions, and customizable personalities.
+A full-stack application for immersive roleplay conversations and chronicle storytelling with AI-powered characters. Supports multiple LLM providers, persistent sessions, customizable personalities, and a document-processing pipeline that turns PDFs into RAG-powered narrative experiences.
 
-## Table of Contents
+## Languages & Tools
 
-- [Features](#features)
-- [Requirements](#requirements)
-- [Quick Start](#quick-start)
-- [Usage](#usage)
-- [Project Structure](#project-structure)
-- [Testing](#testing)
-- [Troubleshooting](#troubleshooting)
-- [Contributing](#contributing)
-- [License](#license)
-
-### **Languages**
 ![Python](https://img.shields.io/badge/Python-3776AB?style=for-the-badge&logo=python&logoColor=white)
-![HTML5](https://img.shields.io/badge/HTML5-E34F26?style=for-the-badge&logo=html5&logoColor=white)
-![CSS3](https://img.shields.io/badge/CSS3-1572B6?style=for-the-badge&logo=css3&logoColor=white)
 ![REACT](https://img.shields.io/badge/-ReactJs-61DAFB?style=for-the-badge&logo=react&logoColor=white)
 ![JAVASCRIPT](https://shields.io/badge/JavaScript-F7DF1E?style=for-the-badge&logo=JavaScript&logoColor=000)
-
-### **Tools**
 ![SQLite](https://img.shields.io/badge/SQLite-07405E?style=for-the-badge&logo=sqlite&logoColor=white)
 [![Ollama](https://img.shields.io/badge/Ollama-fff?style=for-the-badge&logo=ollama&logoColor=000)](#)
+![FastAPI](https://img.shields.io/badge/FastAPI-009688?style=for-the-badge&logo=fastapi&logoColor=white)
+
 ## Features
 
-- **Multiple AI Providers**: Works with OpenAI, Anthropic Claude, Deepseek and local Ollama models
-- **Persistent Sessions**: Conversations are saved locally and can be resumed later
-- **Custom Personalities**: Create and select different character personas
-- **Memory Management**: Automatic conversation trimming and summarization
-
-## Requirements
-
-- Python 3.11+ (tested on 3.13)
-- Node.js 18+ and npm
-- API key for your chosen provider (OpenAI, Anthropic, or an Ollama-compatible provider)
+- **Multiple AI Providers** -- OpenAI, Anthropic Claude, DeepSeek, Google Gemini, Grok, and local Ollama models
+- **Persona Chat** -- Create custom character personalities with system prompts, scenarios, and avatars
+- **Persistent Sessions** -- Conversations are saved locally and can be resumed later
+- **Memory Management** -- Automatic conversation summarization and trimming
+- **Chronicle System** -- Upload PDFs (novels, game books) and build a structured knowledge base
+- **RAG-Powered Chat** -- Chronicle chat uses vector search over extracted PDF content for narrative context
+- **Story Beat Extraction** -- Automatic extraction of plot points, character arcs, and world events
+- **Entity Processing** -- Characters and lore entities are extracted, classified, and analyzed per chapter
+- **Theming** -- 8 built-in themes + custom theme creation with background image support
 
 ## Quick Start
 
-### 1. Set up Virtual Environment
-
-**Windows (PowerShell):**
-```powershell
-python -m venv .venv
-.\.venv\Scripts\Activate.ps1
-pip install -r requirements.txt
-```
-
-**Linux/macOS:**
 ```bash
+# 1. Set up virtual environment
 python -m venv .venv
-source .venv/bin/activate
+source .venv/bin/activate        # Windows: .\.venv\Scripts\Activate.ps1
 pip install -r requirements.txt
-```
 
-### 2. Configure Environment Variables
+# 2. Configure environment
+echo "PROVIDER=ollama\nMODEL_NAME=qwen2.5:7b\nEMBEDDING_MODEL=thenlper/gte-small" > .env
 
-Create a `.env` file in the project root with the following variables:
-
-```env
-API_KEY=your_api_key_here
-PROVIDER=openai
-MODEL_NAME=gpt-4o-mini
-```
-
-**Provider Options:**
-- `openai` - OpenAI GPT models
-- `anthropic` - Anthropic Claude models
-- `ollama` - Local Ollama models
-
-### 3. Run the Application
-
-From the project root, start both the backend and frontend with:
-
-```powershell
+# 3. Run
 npm run fboth
 ```
 
-You can also run them separately:
+Open `http://localhost:5173` in your browser.
 
-```powershell
-npm run backend
-npm run frontend
-```
+## Documentation
 
-## Usage
-
-1. **Select or Create a Persona**: On startup, choose an existing personality or create a new one
-2. **Start Chatting**: Type your message and press Enter
-3. **Exit**: Type `Exit` to save your session and quit
+| Document | Description |
+|----------|-------------|
+| [Architecture](docs/architecture.md) | System design, data flows, component overview |
+| [Setup & Installation](docs/setup.md) | Prerequisites, configuration, provider setup |
+| [API Reference](docs/api-reference.md) | All REST endpoints with request/response schemas |
+| [RAG Pipeline](docs/rag-pipeline.md) | Document processing, beat extraction, entity processing |
+| [Database Schema](docs/database-schema.md) | SQLAlchemy models, relationships, ER diagram |
+| [Frontend Guide](docs/frontend-guide.md) | React components, routing, theming system |
 
 ## Project Structure
 
-```text
+```
 Backend/
-â”œâ”€â”€ App/
-â”‚   â”œâ”€â”€ api/
-â”‚   â”‚   â”œâ”€â”€ chat_router.py
-â”‚   â”‚   â”œâ”€â”€ chronicle_router.py
-â”‚   â”‚   â””â”€â”€ documents_router.py
-â”‚   â”œâ”€â”€ models/
-â”‚   â”‚   â”œâ”€â”€ dbbase.py
-â”‚   â”‚   â”œâ”€â”€ models.py
-â”‚   â”‚   â””â”€â”€ rpg_sessions.py
-â”‚   â”œâ”€â”€ services/
-â”‚   â”‚   â”œâ”€â”€ documents.py
-â”‚   â”‚   â”œâ”€â”€ ingestion.py
-â”‚   â”‚   â””â”€â”€ vectorstore.py
-â”‚   â”œâ”€â”€ main.py
-â”‚   â”œâ”€â”€ chat.py
-â”‚   â”œâ”€â”€ cli.py
-â”‚   â”œâ”€â”€ config.py
-â”‚   â”œâ”€â”€ database.py
-â”‚   â”œâ”€â”€ memory.py
-â”‚   â”œâ”€â”€ personalities.py
-â”‚   â””â”€â”€ response.py
-â”œâ”€â”€ tests/
-â”‚   â”œâ”€â”€ conftest.py
-â”‚   â””â”€â”€ test_*.py
+├── App/
+│   ├── api/           # FastAPI routers (chat, chronicle, documents)
+│   ├── models/        # SQLAlchemy models (chat + chronicle domains)
+│   └── services/      # Business logic (chat, documents, beats, entities, utility)
+├── data/              # SQLite DB, ChromaDB, uploaded files
+└── tests/             # pytest test suite
 
 frontend/
-â”œâ”€â”€ src/
-â”‚   â”œâ”€â”€ components/
-â”‚   â”œâ”€â”€ api.js
-â”‚   â”œâ”€â”€ App.jsx
-â”‚   â””â”€â”€ index.jsx
-â”œâ”€â”€ index.html
-â””â”€â”€ package.json
+├── src/
+│   ├── components/    # 14 React components
+│   ├── api.js         # API client
+│   ├── App.jsx        # Root component with routing
+│   └── themes.js      # Theme definitions
+└── package.json
 ```
 
 ## Dependencies
 
-- **aisuite** - Unified interface for multiple LLM providers
-- **python-dotenv** - Environment variable management
-- **pytest** - Testing framework
+**Python:** FastAPI, SQLAlchemy, ChromaDB, LangChain (OpenAI/Anthropic/Ollama/Gemini), PyMuPDF, SentenceTransformers
+
+**Frontend:** React 18, React Router 7, Vite 6, Tailwind CSS 4, Lucide React
 
 ## Testing
 
-Run the test suite:
-
-```powershell
+```bash
 cd Backend
 pytest
 ```
-
-## Troubleshooting
-
-### JSON Circular Reference Error
-If you see a "Circular reference detected" error, ensure the `messages` list passed to `get_response()` is a flat list of message dictionaries with no nested objects.
-
-### Session Growing Too Large
-The app uses summarization and trimming to manage conversation history. If sessions grow unexpectedly large:
-- Increase trimming frequency in `memory.py`
-- Shorten saved history
-
-## Contributing
-
-1. Fork the repository
-2. Create a feature branch
-3. Make your changes
-4. Run tests locally
-5. Open a pull request with a clear description
 
 ## License
 
