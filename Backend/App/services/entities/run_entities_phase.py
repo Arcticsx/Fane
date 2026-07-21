@@ -1,7 +1,7 @@
 import sys
 import time
 
-from Backend.App.services.entities.process_lore import classify_lore, persist_lore, persist_lore_in_chapter
+from Backend.App.services.entities.process_lore import classify_lore, persist_lore, persist_lore_in_chapter, persist_lore_segments
 
 from ..utility.getdb import get_db
 from ..utility.response import get_response
@@ -529,18 +529,27 @@ def _step_lore_segment(source_doc_id: str, session_id: str, classified_lore: lis
 
         if classified_lore is None:
             classified_lore = _step_lore_classify(source_doc_id, session_id, None)
-        
+
         try:
             start_step(db, session_id, phase, step)
         except Exception:
             pass
 
         try:
-            # Implement lore segmentation logic here
-            # For now, we just mark the step as complete
-            complete_step(db, session_id, phase, step)
+            
+            total_chapters = len(
+                db.query(ChronicleChapter).filter(ChronicleChapter.session_id == session_id).all()
+            )
+            
+            segmented_lore = segment_characters(classified_lore, book_total_chapters=total_chapters)
+
+            for lore_entity in segmented_lore:
+                persist_lore_segments(session_id, lore_entity, db)
+
+                complete_step(db, session_id, phase, step)
 
         except Exception as e:
+            
             fail_step(db, session_id, phase, step, e)
             _mark_source_failed(db, source_doc_id, e)
             print(f"[run_entities] Error segmenting lore for {source_doc_id}: {e}", file=sys.stderr)

@@ -126,3 +126,29 @@ def persist_lore(db, session_id, lore_entities):
             db.add(new_lore)
     db.commit()
     return True
+
+def persist_lore_segments(session_id, lore_entity, db):
+    lore_record = db.query(LoreEntity).filter(
+        LoreEntity.session_id == session_id,
+        LoreEntity.name == lore_entity.get("name")
+    ).first()
+
+    if not lore_record:
+        print(f"[persist_lore_segments] Lore entity {lore_entity.get('name')} not found in database for session {session_id}, skipping segment insertion.", file=sys.stderr)
+        return False
+
+    # Clear existing segments so reruns don't leave stale data from old thresholds
+    db.query(LoreSegment).filter(
+        LoreSegment.entity_id == lore_record.id
+    ).delete()
+
+    for segment in lore_entity.get("segments", []):
+        db.add(LoreSegment(
+            entity_id=lore_record.id,
+            segment_number=segment.get("segment_number"),
+            chapter_start=segment.get("chapter_start"),
+            chapter_end=segment.get("chapter_end")
+        ))
+
+    db.commit()
+    return True
