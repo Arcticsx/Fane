@@ -155,6 +155,8 @@ class ChronicleChapter(Base):
     end_page = Column(Integer, nullable=False)  # e.g., 10
     page_range = Column(String, nullable=False)  # e.g., "1-10"
     characters = Column(JSON, nullable=True)  # list of character names or IDs
+    lore_entries = Column(JSON, nullable=True)  # list of lore entry IDs
+    is_closed = Column(Boolean, default=False)
 
     session = relationship("RpgSession", back_populates="chapters")
     turns = relationship(
@@ -253,19 +255,57 @@ class CharacterArcState(Base):
 
 
 
-class LoreEntry(Base):
-    __tablename__ = "lore_entry"
+class LoreEntity(Base):
+    __tablename__ = "lore_entity"
 
     id = Column(String, primary_key=True, default=_uuid)
     session_id = Column(String, ForeignKey("rpg_sessions.id", ondelete="CASCADE"), nullable=False)
     source_document_id = Column(String, ForeignKey("source_document.id", ondelete="SET NULL"), nullable=True)
-    category = Column(String)
-    title = Column(String)
-    body_md = Column(Text)
-    pinned = Column(Boolean, default=False)
-    chroma_chunk_id = Column(String, nullable=True)  # references a Chroma vector id, not a SQL FK
-    source_document = relationship("SourceDocument", back_populates="lore_entries")
-    session = relationship("RpgSession", back_populates="lore_entries")
+    name = Column(String)
+    entity_type = Column(String)  # "Location" | "Faction" | "Item" | "Concept"
+    classification = Column(String, default="static")  # "static" | "evolving"
+    total_pages = Column(Integer, default=0)
+    num_chapters_present = Column(Integer, default=0)
+
+    spans = relationship("LoreSpan", back_populates="entity", cascade="all, delete-orphan", order_by="LoreSpan.chapter_number")
+    segments = relationship("LoreSegment", back_populates="entity", cascade="all, delete-orphan", order_by="LoreSegment.segment_number")
+    states = relationship("LoreState", back_populates="entity", cascade="all, delete-orphan")
+
+
+class LoreSpan(Base):
+    __tablename__ = "lore_span"
+    id = Column(String, primary_key=True, default=_uuid)
+    entity_id = Column(String, ForeignKey("lore_entity.id", ondelete="CASCADE"), nullable=False)
+    chapter_number = Column(Integer, nullable=False)
+    start_page = Column(Integer, nullable=False)
+    end_page = Column(Integer, nullable=False)
+    page_count = Column(Integer, nullable=False)
+    entity = relationship("LoreEntity", back_populates="spans")
+
+
+class LoreSegment(Base):
+    __tablename__ = "lore_segment"
+    id = Column(String, primary_key=True, default=_uuid)
+    entity_id = Column(String, ForeignKey("lore_entity.id", ondelete="CASCADE"), nullable=False)
+    segment_number = Column(Integer, nullable=False)
+    chapter_start = Column(Integer, nullable=False)
+    chapter_end = Column(Integer, nullable=False)
+    entity = relationship("LoreEntity", back_populates="segments")
+    state = relationship("LoreState", back_populates="segment", uselist=False, cascade="all, delete-orphan")
+
+
+class LoreState(Base):
+    __tablename__ = "lore_state"
+    id = Column(String, primary_key=True, default=_uuid)
+    entity_id = Column(String, ForeignKey("lore_entity.id", ondelete="CASCADE"), nullable=False)
+    segment_id = Column(String, ForeignKey("lore_segment.id", ondelete="CASCADE"), nullable=False)
+
+    description_md = Column(Text)     # what it is
+    significance_md = Column(Text)    # why it matters / role in plot (delta-style, like backstory)
+    mechanics_md = Column(Text)       # type-specific: hazards/rules/powers/manifestations
+
+    entity = relationship("LoreEntity", back_populates="states")
+    segment = relationship("LoreSegment", back_populates="state")
 
 
 class StoryBeat(Base):

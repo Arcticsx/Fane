@@ -32,7 +32,13 @@ PHASE_STEPS = {
         ("characters_classify",    800),
         ("characters_persist",     801),
         ("characters_segment",     802),
-        ("characters_arc",     803),
+        ("characters_arc",         803),
+    ],
+    "lore_processing": [
+        ("lore_classify",          900),
+        ("lore_persist",           901),
+        ("lore_segment",           902),
+        ("lore_arc",               903),
     ],
 }
 

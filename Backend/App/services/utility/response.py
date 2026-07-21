@@ -34,7 +34,7 @@ ENTITIES_SCHEMA = {
         "type": "object",
         "properties": {
             "name": {"type": "string"},
-            "type": {"type": "string", "enum": ["character", "location", "organization", "artifact", "concept"]},
+            "type": {"type": "string", "enum": ["character", "location", "faction", "item", "concept"]},
             "pages": {"type": "array", "items": {"type": "integer"}},
         },
         "required": ["name", "type", "pages"],

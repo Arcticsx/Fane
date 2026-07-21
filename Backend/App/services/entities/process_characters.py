@@ -78,8 +78,7 @@ Data:
 """
 
 
-def rank_characters(characters):
-    return sorted(characters, key=lambda c: (c.get("total_pages", 0), len(c.get("spans", []))), reverse=True)
+
 
 def span_statistic_of_character(character, book_total_pages):
     spans = character.get("spans", [])
@@ -220,10 +219,6 @@ def persist_character_spans(session_id, character):
         if not character_record:
             print(f"[store_character_spans] Character {character.get('name')} not found in database for session {session_id}, skipping span insertion.", file=sys.stderr)
             return False
-        
-        # if db.query(CharacterSpan).filter(CharacterSpan.character_id == character_record.id).first() is not None:
-        #     print(f"[store_character_spans] Spans for character {character.get('name')} already exist for session {session_id}, skipping insertion.", file=sys.stderr)
-        #     return False
    
         for span in character.get("spans",[]):
             chapter_number = None

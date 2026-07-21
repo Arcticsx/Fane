@@ -1,15 +1,17 @@
 import sys
 import time
 
+from Backend.App.services.entities.process_lore import classify_lore, persist_lore, persist_lore_in_chapter
+
 from ..utility.getdb import get_db
 from ..utility.response import get_response
 from ..utility.status import is_step_completed, start_step, complete_step, fail_step
-from ...models.rpg_sessions import Entities, SourceDocument, Character, CharacterSegment, CharacterArcState, ChronicleChapter
+from ...models.rpg_sessions import Entities, LoreEntity, SourceDocument, Character, CharacterSegment, CharacterArcState, ChronicleChapter
 from ..documents.documents import generate_page_windows
-from .process_entities import extract_entities_from_window, span_construction, seperate_candidates, store_candidate_entities
+from .process_entities import extract_entities_from_window, span_construction, seperate_candidates, store_candidate_entities, rank_entities
 from .entities_reduce import merge_entity_clusters
 from .process_characters import (
-    rank_characters,
+    
     span_statistic_of_character,
     persist_characters_in_chapters,
     persist_characters,
@@ -45,9 +47,13 @@ def run_entities_phase(source_doc_id: str, session_id: str):
     _step_characters_segment(source_doc_id, session_id, spanned_characters)
 
     _step_characters_arc_llm(source_doc_id, session_id)
+    
+    spanned_lore = _step_lore_classify(source_doc_id, session_id, lore)
+    _step_lore_persist(source_doc_id, session_id, spanned_lore)
+    _step_lore_segment(source_doc_id, session_id, spanned_lore)
 
 
-def _get_source_doc(source_doc_id: str):
+def _get_source_doc_total_pages(source_doc_id: str):
     with get_db() as db:
         source_doc = db.query(SourceDocument).filter(SourceDocument.id == source_doc_id).first()
         if not source_doc or not source_doc.total_pages:
@@ -57,7 +63,7 @@ def _get_source_doc(source_doc_id: str):
 
 def _re_extract_entities(source_doc_id: str, session_id: str) -> tuple:
     print(f"[run_entities] Re-extracting entities for {source_doc_id}", file=sys.stderr)
-    total_pages = _get_source_doc(source_doc_id)
+    total_pages = _get_source_doc_total_pages(source_doc_id)
     windows = generate_page_windows(total_pages=total_pages, window_size=5, overlap=1)
     candidate_entities = []
     for start_page, end_page in windows:
@@ -103,7 +109,7 @@ def _step_entities_extract(source_doc_id: str, session_id: str):
             pass
 
     try:
-        total_pages = _get_source_doc(source_doc_id)
+        total_pages = _get_source_doc_total_pages(source_doc_id)
         windows = generate_page_windows(total_pages=total_pages, window_size=5, overlap=1)
         candidate_entities = []
         consecutive_failures = 0
@@ -246,7 +252,9 @@ def _step_characters_classify(source_doc_id: str, session_id: str, characters: l
             return None
 
     if characters is None:
-        characters = _step_entities_separate(source_doc_id, session_id, None)[0]
+        with get_db() as db:
+            entities = db.query(Entities).filter(Entities.session_id == session_id).all()
+        characters = _step_entities_separate(source_doc_id, session_id, [e.to_dict() for e in entities])[0]    
     with get_db() as db:
         try:
             start_step(db, session_id, phase, step)
@@ -254,13 +262,11 @@ def _step_characters_classify(source_doc_id: str, session_id: str, characters: l
             pass
 
     try:
-        with get_db() as db:
-            source_document = db.query(SourceDocument).filter(SourceDocument.id == source_doc_id).first()
-            book_total_pages = source_document.total_pages if source_document else 0
+        book_total_pages = _get_source_doc_total_pages(source_doc_id)
 
-        ranked_characters = rank_characters(characters)
+        ranked_entities = rank_entities(characters)
         spanned_characters = []
-        for character in ranked_characters:
+        for character in ranked_entities:
             span_stats = span_statistic_of_character(character, book_total_pages)
             spanned_characters.append(span_stats)
 
@@ -442,3 +448,100 @@ def _run_arc_llm_for_session(session_id: str):
                     db.add(arc_record)
                     db.commit()
                     print(f"[run_entities] Saved arc state for {character_name} segment {segment.segment_number}", file=sys.stderr)
+
+
+def _step_lore_classify(source_doc_id: str, session_id: str, lore: list | None):
+    phase = "lore_processing"
+    step = "lore_classify"
+
+    with get_db() as db:
+        if is_step_completed(db, session_id, phase, step):
+            return None
+
+        if lore is None:
+            entities = db.query(Entities).filter(Entities.session_id == session_id).all()
+            lore = _step_entities_separate(source_doc_id, session_id, [e.to_dict() for e in entities])[1]
+        
+        try:
+            start_step(db, session_id, phase, step)
+        except Exception:
+            pass
+
+    try:
+        ranked_lore = rank_entities(lore)
+        book_total_pages = _get_source_doc_total_pages(source_doc_id)
+        classified_lore = []
+        
+        for entry in ranked_lore:
+            classified_entry = classify_lore(entry, book_total_pages)  # Replace 100 with actual total pages if available
+            classified_lore.append(classified_entry)
+        
+        
+        with get_db() as db:
+            complete_step(db, session_id, phase, step)
+
+        return classified_lore
+
+    except Exception as e:
+        with get_db() as db:
+            fail_step(db, session_id, phase, step, e)
+            _mark_source_failed(db, source_doc_id, e)
+        print(f"[run_entities] Error classifying lore for {source_doc_id}: {e}", file=sys.stderr)
+        raise
+
+def _step_lore_persist(source_doc_id: str, session_id: str, classified_lore: list | None):
+    phase = "lore_processing"
+    step = "lore_persist"
+
+    with get_db() as db:
+        
+        if is_step_completed(db, session_id, phase, step):
+            return
+
+        if classified_lore is None:
+            classified_lore = _step_lore_classify(source_doc_id, session_id, None)
+        
+        try:
+            start_step(db, session_id, phase, step)
+        except Exception:
+            pass
+
+        try:
+            persisted_chapter = persist_lore_in_chapter(db, session_id, classified_lore)
+            persisted_lore = persist_lore(db, session_id, classified_lore)
+            
+            if persisted_chapter and persisted_lore:
+                complete_step(db, session_id, phase, step)
+
+        except Exception as e:
+            fail_step(db, session_id, phase, step, e)
+            _mark_source_failed(db, source_doc_id, e)
+            print(f"[run_entities] Error persisting lore for {source_doc_id}: {e}", file=sys.stderr)
+            raise
+
+def _step_lore_segment(source_doc_id: str, session_id: str, classified_lore: list | None):
+    phase = "lore_processing"
+    step = "lore_segment"
+
+    with get_db() as db:
+        if is_step_completed(db, session_id, phase, step):
+            return
+
+        if classified_lore is None:
+            classified_lore = _step_lore_classify(source_doc_id, session_id, None)
+        
+        try:
+            start_step(db, session_id, phase, step)
+        except Exception:
+            pass
+
+        try:
+            # Implement lore segmentation logic here
+            # For now, we just mark the step as complete
+            complete_step(db, session_id, phase, step)
+
+        except Exception as e:
+            fail_step(db, session_id, phase, step, e)
+            _mark_source_failed(db, source_doc_id, e)
+            print(f"[run_entities] Error segmenting lore for {source_doc_id}: {e}", file=sys.stderr)
+            raise

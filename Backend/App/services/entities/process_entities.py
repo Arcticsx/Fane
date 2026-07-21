@@ -72,6 +72,8 @@ def _normalize_entity(entity):
         "pages": unique_pages,
     }
 
+def rank_entities(entities):
+    return sorted(entities, key=lambda e: (e.get("total_pages", 0), len(e.get("spans", []))), reverse=True)
 
 
 def extract_entities_from_window(session_id, start_page, end_page):
