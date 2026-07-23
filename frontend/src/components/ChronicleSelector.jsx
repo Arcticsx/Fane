@@ -417,86 +417,170 @@ export default function ChronicleSelector() {
         </section>
 
         {selectedChronicle && (
-          <div className="fixed inset-0 z-[9999] flex items-center justify-center bg-bg/70 p-4 backdrop-blur-sm">
-            <div className="w-full max-w-lg rounded-3xl border border-border/60 bg-surface/95 p-6 shadow-2xl shadow-surface/40">
-              <div className="flex items-start justify-between gap-3">
-                <div>
-                  <p className="text-xs uppercase tracking-[0.26em] text-accent">Chronicle</p>
-                  <h3 className="mt-1 text-2xl font-semibold text-text">{selectedChronicle.title || 'Untitled Chronicle'}</h3>
-                  <p className="mt-2 text-sm text-muted">{selectedChronicle.synopsis || 'No description available.'}</p>
+        <div className="fixed inset-0 z-[9999] flex items-center justify-center bg-bg/70 p-4 backdrop-blur-sm">
+          <div className="w-full max-w-lg overflow-hidden rounded-3xl border border-border/60 bg-surface/95 shadow-2xl shadow-surface/40">
+            
+            {/* Header Section */}
+            <div className="p-6">
+              <div className="flex items-start justify-between gap-4">
+                <div className="flex min-w-0 gap-4">
+                  {/* Avatar - bigger */}
+                  <div className="relative flex h-20 w-20 shrink-0 items-center justify-center overflow-hidden rounded-2xl border border-border/60 bg-bg/40">
+                    {selectedChronicle.avatar ? (
+                      <img 
+                        src={selectedChronicle.avatar} 
+                        alt={selectedChronicle.title || 'Chronicle'} 
+                        className="h-full w-full object-cover"
+                      />
+                    ) : (
+                      <span className="text-3xl font-bold text-accent">
+                        {selectedChronicle.title?.charAt(0).toUpperCase() || 'C'}
+                      </span>
+                    )}
+                  </div>
+                  
+                  {/* Title & Synopsis - no more eyebrow label */}
+                  <div className="min-w-0 pt-1">
+                    <h3 className="truncate text-xl font-semibold text-text">
+                      {selectedChronicle.title || 'Untitled Chronicle'}
+                    </h3>
+                    <p className="mt-1.5 line-clamp-2 text-sm text-muted">
+                      {selectedChronicle.synopsis || 'No description available.'}
+                    </p>
+                  </div>
                 </div>
+
+                {/* Close Button - smaller icon */}
                 <button
                   type="button"
                   onClick={() => {
                     setSelectedChronicle(null);
                     setProcessStatus(null);
                   }}
-                  className="rounded-full bg-surface/80 px-3 py-1.5 text-sm text-muted"
+                  className="shrink-0 rounded-full p-2 text-muted transition-colors hover:bg-bg/40 hover:text-text"
+                  aria-label="Close"
                 >
-                  Close
+                  <svg className="h-4 w-4" fill="none" viewBox="0 0 24 24" strokeWidth="2" stroke="currentColor">
+                    <path strokeLinecap="round" strokeLinejoin="round" d="M6 18L18 6M6 6l12 12" />
+                  </svg>
                 </button>
               </div>
+            </div>
 
-              <div className="mt-6 rounded-2xl border border-border/60 bg-surface/80 p-4">
-                <div className="flex items-center justify-between gap-3">
+            {/* Timeline / Status Section */}
+            <div className="px-6 pb-6">
+              <div className="rounded-2xl border border-border/40 bg-bg/20 p-4">
+                <div className="mb-4 flex items-center justify-between">
                   <div>
-                    <p className="text-xs uppercase tracking-[0.2em] text-muted">Status</p>
-                    <p className="mt-1 text-sm font-medium text-text">{statusSummary}</p>
-                    <p className="mt-1 text-xs text-muted">{statusDetail}</p>
+                    <p className="text-xs uppercase tracking-[0.2em] text-muted">Overall Status</p>
+                    <p className="mt-0.5 text-sm font-medium text-text">{statusSummary}</p>
                   </div>
-                  <button
-                    type="button"
-                    onClick={() => navigate(`/chronicle/${encodeURIComponent(selectedChronicle.id)}`)}
-                    disabled={isProcessing}
-                    className="rounded-full bg-accent px-4 py-2 text-sm font-semibold text-text transition disabled:cursor-not-allowed disabled:opacity-50"
-                  >
-                    {isProcessing ? 'Processing…' : 'Start Chronicle'}
-                  </button>
+                  {isProcessing ? (
+                    <div className="flex items-center gap-2">
+                      <div className="h-1.5 w-16 overflow-hidden rounded-full bg-border/40">
+                        <div 
+                          className="h-full rounded-full bg-accent transition-all duration-500" 
+                          style={{ width: `${progressPercent}%` }}
+                        />
+                      </div>
+                      <span className="text-xs font-medium text-accent tabular-nums">
+                        {progressPercent}%
+                      </span>
+                    </div>
+                  ) : (
+                    <span className="rounded-full bg-emerald-500/10 px-2.5 py-1 text-xs font-medium text-emerald-400">
+                      Ready
+                    </span>
+                  )}
                 </div>
 
-                <div className="mt-4 rounded-xl border border-border/40 bg-surface/70 p-3">
-                  <div className="flex items-center justify-between text-sm">
-                    <span className="font-medium text-text">Progress</span>
-                    <span className="text-accent">{isProcessing ? `${progressPercent}%` : '100%'}</span>
-                  </div>
-                  <div className="mt-2 h-2 overflow-hidden rounded-full bg-surface/80">
-                    <div
-                      className="h-full rounded-full bg-gradient-to-r from-accent to-accent2 transition-all"
-                      style={{ width: `${isProcessing ? progressPercent : 100}%` }}
-                    />
-                  </div>
-                  <p className="mt-2 text-xs text-muted">
-                    {isProcessing ? `${completedSteps}/${totalSteps} steps completed` : 'All setup steps completed'}
-                  </p>
+                {/* The Process Timeline */}
+                <div className="flow-root">
+                  <ul role="list" className="space-y-3">
+                  {/* Completed Step */}
+                  <li className="relative flex gap-2.5">
+                    {(isProcessing || activePhase) && (
+                      <span className="absolute left-[7px] top-4 h-[calc(100%+0.5rem)] w-px bg-border/40" aria-hidden="true"></span>
+                    )}
+                    <div className="relative z-10 flex h-4 w-4 shrink-0 items-center justify-center rounded-full bg-accent/10 ring-2 ring-surface">
+                      <svg className="h-2.5 w-2.5 text-accent" fill="none" viewBox="0 0 24 24" strokeWidth="3.5" stroke="currentColor">
+                        <path strokeLinecap="round" strokeLinejoin="round" d="M4.5 12.75l6 6 9-13.5" />
+                      </svg>
+                    </div>
+                    <div className="min-w-0 flex-1">
+                      <p className="text-sm font-medium text-text">Chronicle Initialized</p>
+                      <p className="text-xs text-muted">
+                        {completedSteps > 0 ? `${completedSteps}/${totalSteps} setup steps completed` : 'Ready to start'}
+                      </p>
+                    </div>
+                  </li>
+
+                  {/* Active Phase */}
+                  {isProcessing && activePhase && (
+                    <li className="relative flex gap-2.5">
+                      {activeStep && (
+                        <span className="absolute left-[7px] top-4 h-[calc(100%+0.5rem)] w-px bg-border/40" aria-hidden="true"></span>
+                      )}
+                      <div className="relative z-10 flex h-4 w-4 shrink-0 items-center justify-center rounded-full bg-accent/10 ring-2 ring-surface">
+                        <span className="relative flex h-1.5 w-1.5">
+                          <span className="absolute inline-flex h-full w-full animate-ping rounded-full bg-accent opacity-75"></span>
+                          <span className="relative inline-flex h-1.5 w-1.5 rounded-full bg-accent"></span>
+                        </span>
+                      </div>
+                      <div className="min-w-0 flex-1">
+                        <p className="text-sm font-medium text-text">{activePhase.phase || activePhase.status}</p>
+                        <p className="text-xs text-muted">{activePhase.status}</p>
+                      </div>
+                    </li>
+                  )}
+
+                  {/* Active Step */}
+                  {isProcessing && activeStep && (
+                    <li className="relative flex gap-2.5">
+                      <div className="relative z-10 flex h-4 w-4 shrink-0 items-center justify-center rounded-full bg-bg/40 ring-2 ring-surface">
+                        <span className="h-1 w-1 rounded-full bg-muted/60"></span>
+                      </div>
+                      <div className="min-w-0 flex-1">
+                        <p className="text-sm font-medium text-text">{stepSummary}</p>
+                        <p className="text-xs text-muted">{activeStep.status || 'In progress...'}</p>
+                      </div>
+                    </li>
+                  )}
+
+                  {/* Loading State */}
+                  {processLoading && !isProcessing && (
+                    <li className="relative flex gap-2.5">
+                      <div className="relative z-10 flex h-4 w-4 shrink-0 items-center justify-center rounded-full bg-bg/40 ring-2 ring-surface">
+                        <span className="h-1.5 w-1.5 animate-pulse rounded-full bg-muted"></span>
+                      </div>
+                      <div className="min-w-0 flex-1">
+                        <p className="text-sm font-medium text-text">Loading status...</p>
+                        <p className="text-xs text-muted">Fetching processing details</p>
+                      </div>
+                    </li>
+                  )}
+
+                  </ul>
                 </div>
-
-                <div className="mt-4 space-y-3">
-                  <div className="rounded-xl border border-border/40 bg-surface/70 p-3">
-                    <p className="text-xs uppercase tracking-[0.2em] text-muted">Current phase</p>
-                    <p className="mt-1 text-sm font-medium text-text">
-                      {activePhase ? activePhase.phase || activePhase.status : 'Waiting for status...'}
-                    </p>
-                    <p className="mt-1 text-xs text-muted">
-                      {activePhase ? activePhase.status : 'No phase data yet'}
-                    </p>
-                  </div>
-
-                  <div className="rounded-xl border border-border/40 bg-surface/70 p-3">
-                    <p className="text-xs uppercase tracking-[0.2em] text-muted">Current step</p>
-                    <p className="mt-1 text-sm font-medium text-text">{stepSummary}</p>
-                    <p className="mt-1 text-xs text-muted">
-                      {activeStep ? activeStep.status : 'No step data yet'}
-                    </p>
-                  </div>
-                </div>
-
-                {processLoading && (
-                  <p className="mt-4 text-sm text-muted">Loading processing details…</p>
-                )}
               </div>
             </div>
+
+            {/* Footer Action */}
+            <div className="flex items-center justify-between gap-4 border-t border-border/40 bg-bg/20 px-6 py-4">
+              <p className="hidden text-xs text-muted sm:block">{statusDetail}</p>
+              <button
+                type="button"
+                onClick={() => navigate(`/chronicle/${encodeURIComponent(selectedChronicle.id)}`)}
+                disabled={isProcessing || processLoading}
+                className="ml-auto rounded-full bg-accent px-5 py-2.5 text-sm font-semibold text-bg transition hover:opacity-90 disabled:cursor-not-allowed disabled:opacity-50"
+              >
+                {isProcessing ? 'Processing…' : 'Start Chronicle'}
+              </button>
+            </div>
+
           </div>
-        )}
+        </div>
+      )}
     </main>
   );
 }

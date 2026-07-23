@@ -271,7 +271,7 @@ function Sidebar({ activeView, onViewChange, onCreateClick }) {
                     <div className="absolute left-0 top-1/2 -translate-y-1/2 h-6 w-0.5 bg-accent rounded-r-full shadow-[0_0_10px_rgba(99,102,241,0.5)]" />
                   )}
 
-                  <div className="h-8 w-8 shrink-0 overflow-hidden rounded-full bg-gradient-to-br from-accent2 to-accent">
+                  <div className="h-8 w-8 shrink-0 overflow-hidden rounded-full bg-gradient from-accent2 to-accent">
                     {item.avatar ? (
                       <img src={getImageUrl(item.avatar)} alt={item.title} className="h-full w-full object-cover" />
                     ) : (
@@ -328,7 +328,7 @@ function Sidebar({ activeView, onViewChange, onCreateClick }) {
                   <div className="absolute left-0 top-1/2 -translate-y-1/2 h-6 w-0.5 bg-accent rounded-r-full shadow-[0_0_10px_rgba(99,102,241,0.5)]" />
                 )}
 
-                <div className="h-8 w-8 shrink-0 overflow-hidden rounded-full bg-gradient-to-br from-accent2 to-accent">
+                <div className="h-8 w-8 shrink-0 overflow-hidden rounded-full bg-gradient from-accent2 to-accent">
                   {item.persona_avatar ? (
                     <img
                       src={getImageUrl(item.persona_avatar)}

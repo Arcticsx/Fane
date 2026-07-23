@@ -320,7 +320,7 @@ function PersonalitySelector({
                     onClick={() => navigate(`/chronicle/${encodeURIComponent(chronicle.id)}`)}
                   >
                     {/* Chronicle avatar */}
-                    <div className="h-20 w-20 shrink-0 overflow-hidden rounded-xl bg-gradient-to-br from-accent/80 to-accent2/80 shadow-inner">
+                    <div className="h-20 w-20 shrink-0 overflow-hidden rounded-xl bg-gradient from-accent/80 to-accent2/80 shadow-inner">
                       {chronicle.avatar ? (
                         <img
                           src={getImageUrl(chronicle.avatar)}
