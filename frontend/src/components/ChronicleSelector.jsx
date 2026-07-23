@@ -191,6 +191,17 @@ export default function ChronicleSelector() {
     ? (activeStep.step || activeStep.status || 'Working through setup')
     : 'Waiting for the next step to begin';
 
+  const genreIcons = {
+    'Drama': 'theater_comedy', 'Slice of Life': 'home', 'LGBTQ': 'favorite',
+    'Fantasy': 'auto_awesome', 'Sci-Fi': 'rocket', 'Horror': 'skull',
+    'Romance': 'favorite', 'Adventure': 'explore', 'Mystery': 'search',
+    'Thriller': 'bolt', 'Action': 'sprint', 'Historical': 'history',
+    'Cyberpunk': 'memory', 'Mythic': 'temple', 'Western': 'flag',
+  };
+  const selectedGenres = selectedChronicle?.genre
+    ? selectedChronicle.genre.split(/[,|]/g).map(g => g.trim()).filter(Boolean)
+    : [];
+
   const searchTerm = search.trim().toLowerCase();
 
   const filtered = chronicles.filter((chronicle) => {
@@ -418,165 +429,170 @@ export default function ChronicleSelector() {
 
         {selectedChronicle && (
         <div className="fixed inset-0 z-[9999] flex items-center justify-center bg-bg/70 p-4 backdrop-blur-sm">
-          <div className="w-full max-w-lg overflow-hidden rounded-3xl border border-border/60 bg-surface/95 shadow-2xl shadow-surface/40">
-            
-            {/* Header Section */}
-            <div className="p-6">
-              <div className="flex items-start justify-between gap-4">
-                <div className="flex min-w-0 gap-4">
-                  {/* Avatar - bigger */}
-                  <div className="relative flex h-20 w-20 shrink-0 items-center justify-center overflow-hidden rounded-2xl border border-border/60 bg-bg/40">
-                    {selectedChronicle.avatar ? (
-                      <img 
-                        src={selectedChronicle.avatar} 
-                        alt={selectedChronicle.title || 'Chronicle'} 
-                        className="h-full w-full object-cover"
-                      />
-                    ) : (
-                      <span className="text-3xl font-bold text-accent">
-                        {selectedChronicle.title?.charAt(0).toUpperCase() || 'C'}
-                      </span>
-                    )}
-                  </div>
-                  
-                  {/* Title & Synopsis - no more eyebrow label */}
-                  <div className="min-w-0 pt-1">
-                    <h3 className="truncate text-xl font-semibold text-text">
-                      {selectedChronicle.title || 'Untitled Chronicle'}
-                    </h3>
-                    <p className="mt-1.5 line-clamp-2 text-sm text-muted">
-                      {selectedChronicle.synopsis || 'No description available.'}
-                    </p>
-                  </div>
-                </div>
+          <div className="absolute inset-0 bg-gradient-to-br from-bg to-bg z-0 pointer-events-none" />
+          <div className="absolute top-1/4 left-1/4 w-[500px] h-[500px] bg-accent/5 rounded-full blur-[100px] z-0 pointer-events-none" />
+          <div className="absolute bottom-1/4 right-1/4 w-[600px] h-[600px] bg-accent2/5 rounded-full blur-[120px] z-0 pointer-events-none" />
 
-                {/* Close Button - smaller icon */}
-                <button
-                  type="button"
-                  onClick={() => {
-                    setSelectedChronicle(null);
-                    setProcessStatus(null);
-                  }}
-                  className="shrink-0 rounded-full p-2 text-muted transition-colors hover:bg-bg/40 hover:text-text"
-                  aria-label="Close"
-                >
-                  <svg className="h-4 w-4" fill="none" viewBox="0 0 24 24" strokeWidth="2" stroke="currentColor">
-                    <path strokeLinecap="round" strokeLinejoin="round" d="M6 18L18 6M6 6l12 12" />
-                  </svg>
-                </button>
+          <div className="glass-panel neon-glow relative z-10 w-full max-w-3xl rounded-[24px] overflow-hidden flex flex-col">
+            
+            <div className="flex flex-col md:flex-row p-6 gap-6 border-b border-border/30 bg-bg/50">
+              <div className="w-full md:w-1/3 shrink-0">
+                <div className="aspect-[2/3] rounded-xl overflow-hidden relative shadow-xl">
+                  {selectedChronicle.avatar ? (
+                    <img
+                      src={getImageUrl(selectedChronicle.avatar)}
+                      alt={selectedChronicle.title || 'Chronicle'}
+                      className="w-full h-full object-cover"
+                    />
+                  ) : (
+                    <div className="w-full h-full bg-gradient-to-br from-accent to-accent2 flex items-center justify-center text-4xl font-bold text-text">
+                      {selectedChronicle.title?.charAt(0).toUpperCase() || 'C'}
+                    </div>
+                  )}
+                  <div className="absolute inset-0 bg-gradient-to-t from-black/60 to-transparent" />
+                </div>
+              </div>
+
+              <div className="w-full md:w-2/3 flex flex-col justify-center">
+                <div className="flex items-center gap-2 mb-2 text-accent">
+                  <span className="material-symbols-outlined text-xl" style={{ fontVariationSettings: "'FILL' 1" }}>cruelty_free</span>
+                  <span className="text-xs uppercase tracking-[0.2em] opacity-80 font-medium">{isProcessing ? 'Chronicle Processing' : 'Chronicle'}</span>
+                </div>
+                <h1 className="text-2xl font-semibold text-text mb-2">{selectedChronicle.title || 'Untitled Chronicle'}</h1>
+                <p className="text-sm text-muted leading-relaxed">{selectedChronicle.synopsis || 'No description available.'}</p>
+
+                {selectedGenres.length > 0 && (
+                  <div className="flex flex-wrap gap-2 mt-4">
+                    {selectedGenres.map((genre) => (
+                      <div key={genre} className="px-3 py-1 rounded-full bg-surface/80 text-muted text-xs border border-border/20 flex items-center gap-1">
+                        <span className="material-symbols-outlined text-[14px]">{genreIcons[genre] || 'auto_stories'}</span>
+                        {genre}
+                      </div>
+                    ))}
+                  </div>
+                )}
               </div>
             </div>
 
-            {/* Timeline / Status Section */}
-            <div className="px-6 pb-6">
-              <div className="rounded-2xl border border-border/40 bg-bg/20 p-4">
-                <div className="mb-4 flex items-center justify-between">
-                  <div>
-                    <p className="text-xs uppercase tracking-[0.2em] text-muted">Overall Status</p>
-                    <p className="mt-0.5 text-sm font-medium text-text">{statusSummary}</p>
-                  </div>
+            <div className="p-6 flex flex-col gap-6 bg-surface/50">
+              <div className="flex flex-col gap-3">
+                <div className="flex justify-between items-end">
+                  <h2 className="text-xl font-semibold text-text">Overall Status</h2>
                   {isProcessing ? (
-                    <div className="flex items-center gap-2">
-                      <div className="h-1.5 w-16 overflow-hidden rounded-full bg-border/40">
-                        <div 
-                          className="h-full rounded-full bg-accent transition-all duration-500" 
-                          style={{ width: `${progressPercent}%` }}
-                        />
+                    <span className="text-sm font-bold text-accent">{progressPercent}%</span>
+                  ) : (
+                    <span className="rounded-full bg-emerald-500/10 px-2.5 py-0.5 text-xs font-medium text-emerald-400">Ready</span>
+                  )}
+                </div>
+                <div className="h-2 w-full bg-surface-2 rounded-full overflow-hidden">
+                  <div
+                    className={`h-full bg-gradient-to-r from-accent2 to-accent rounded-full ${isProcessing ? 'progress-glow animate-pulse-glow' : ''}`}
+                    style={{ width: isProcessing ? `${progressPercent}%` : '100%' }}
+                  />
+                </div>
+              </div>
+
+              <div className="flex flex-col gap-4">
+                <div className="flex items-center gap-4 p-3 rounded-lg bg-surface/30 border border-border/10">
+                  <div className="w-8 h-8 rounded-full bg-emerald-500/20 text-emerald-400 flex items-center justify-center shrink-0">
+                    <span className="material-symbols-outlined" style={{ fontVariationSettings: "'FILL' 1" }}>check_circle</span>
+                  </div>
+                  <div className="flex-1">
+                    <p className="text-sm font-medium text-text">Chronicle Initialized</p>
+                    <p className="text-xs text-muted">Base lore and characters established.</p>
+                  </div>
+                </div>
+
+                {isProcessing ? (
+                  activePhase ? (
+                    <div className="flex items-center gap-4 p-3 rounded-lg bg-accent/10 border border-accent/30 relative overflow-hidden">
+                      <div className="absolute inset-0 bg-gradient-to-r from-transparent via-accent/5 to-transparent animate-pulse" />
+                      <div className="w-8 h-8 rounded-full bg-accent/20 text-accent flex items-center justify-center shrink-0 relative z-10">
+                        <span className="material-symbols-outlined animate-spin-slow">sync</span>
                       </div>
-                      <span className="text-xs font-medium text-accent tabular-nums">
-                        {progressPercent}%
-                      </span>
+                      <div className="flex-1 relative z-10">
+                        <p className="text-sm font-bold text-accent">{activePhase.phase || activePhase.status || 'Extracting Story Elements'}</p>
+                        <p className="text-xs text-accent/80">{activeStep?.step || activeStep?.status || 'Analyzing narrative arcs and dynamic interactions...'}</p>
+                      </div>
                     </div>
                   ) : (
-                    <span className="rounded-full bg-emerald-500/10 px-2.5 py-1 text-xs font-medium text-emerald-400">
-                      Ready
-                    </span>
-                  )}
-                </div>
-
-                {/* The Process Timeline */}
-                <div className="flow-root">
-                  <ul role="list" className="space-y-3">
-                  {/* Completed Step */}
-                  <li className="relative flex gap-2.5">
-                    {(isProcessing || activePhase) && (
-                      <span className="absolute left-[7px] top-4 h-[calc(100%+0.5rem)] w-px bg-border/40" aria-hidden="true"></span>
-                    )}
-                    <div className="relative z-10 flex h-4 w-4 shrink-0 items-center justify-center rounded-full bg-accent/10 ring-2 ring-surface">
-                      <svg className="h-2.5 w-2.5 text-accent" fill="none" viewBox="0 0 24 24" strokeWidth="3.5" stroke="currentColor">
-                        <path strokeLinecap="round" strokeLinejoin="round" d="M4.5 12.75l6 6 9-13.5" />
-                      </svg>
+                    <div className="flex items-center gap-4 p-3 rounded-lg bg-surface/10 border border-border/10 opacity-50">
+                      <div className="w-8 h-8 rounded-full bg-surface-2 flex items-center justify-center shrink-0">
+                        <div className="h-1.5 w-1.5 rounded-full bg-muted animate-pulse" />
+                      </div>
+                      <div className="flex-1">
+                        <p className="text-sm font-medium text-muted">Loading status...</p>
+                        <p className="text-xs text-muted/70">Fetching processing details</p>
+                      </div>
                     </div>
-                    <div className="min-w-0 flex-1">
-                      <p className="text-sm font-medium text-text">Chronicle Initialized</p>
-                      <p className="text-xs text-muted">
-                        {completedSteps > 0 ? `${completedSteps}/${totalSteps} setup steps completed` : 'Ready to start'}
-                      </p>
+                  )
+                ) : (
+                  <div className="flex items-center gap-4 p-3 rounded-lg bg-surface/30 border border-border/10">
+                    <div className="w-8 h-8 rounded-full bg-emerald-500/20 text-emerald-400 flex items-center justify-center shrink-0">
+                      <span className="material-symbols-outlined" style={{ fontVariationSettings: "'FILL' 1" }}>check_circle</span>
                     </div>
-                  </li>
+                    <div className="flex-1">
+                      <p className="text-sm font-medium text-text">Story Elements Extracted</p>
+                      <p className="text-xs text-muted">Narrative arcs and character dynamics analyzed.</p>
+                    </div>
+                  </div>
+                )}
 
-                  {/* Active Phase */}
-                  {isProcessing && activePhase && (
-                    <li className="relative flex gap-2.5">
-                      {activeStep && (
-                        <span className="absolute left-[7px] top-4 h-[calc(100%+0.5rem)] w-px bg-border/40" aria-hidden="true"></span>
-                      )}
-                      <div className="relative z-10 flex h-4 w-4 shrink-0 items-center justify-center rounded-full bg-accent/10 ring-2 ring-surface">
-                        <span className="relative flex h-1.5 w-1.5">
-                          <span className="absolute inline-flex h-full w-full animate-ping rounded-full bg-accent opacity-75"></span>
-                          <span className="relative inline-flex h-1.5 w-1.5 rounded-full bg-accent"></span>
-                        </span>
-                      </div>
-                      <div className="min-w-0 flex-1">
-                        <p className="text-sm font-medium text-text">{activePhase.phase || activePhase.status}</p>
-                        <p className="text-xs text-muted">{activePhase.status}</p>
-                      </div>
-                    </li>
-                  )}
-
-                  {/* Active Step */}
-                  {isProcessing && activeStep && (
-                    <li className="relative flex gap-2.5">
-                      <div className="relative z-10 flex h-4 w-4 shrink-0 items-center justify-center rounded-full bg-bg/40 ring-2 ring-surface">
-                        <span className="h-1 w-1 rounded-full bg-muted/60"></span>
-                      </div>
-                      <div className="min-w-0 flex-1">
-                        <p className="text-sm font-medium text-text">{stepSummary}</p>
-                        <p className="text-xs text-muted">{activeStep.status || 'In progress...'}</p>
-                      </div>
-                    </li>
-                  )}
-
-                  {/* Loading State */}
-                  {processLoading && !isProcessing && (
-                    <li className="relative flex gap-2.5">
-                      <div className="relative z-10 flex h-4 w-4 shrink-0 items-center justify-center rounded-full bg-bg/40 ring-2 ring-surface">
-                        <span className="h-1.5 w-1.5 animate-pulse rounded-full bg-muted"></span>
-                      </div>
-                      <div className="min-w-0 flex-1">
-                        <p className="text-sm font-medium text-text">Loading status...</p>
-                        <p className="text-xs text-muted">Fetching processing details</p>
-                      </div>
-                    </li>
-                  )}
-
-                  </ul>
-                </div>
+                {isProcessing ? (
+                  <div className="flex items-center gap-4 p-3 rounded-lg bg-surface/10 border border-border/10 opacity-50">
+                    <div className="w-8 h-8 rounded-full bg-surface-2 text-muted flex items-center justify-center shrink-0">
+                      <span className="material-symbols-outlined">schedule</span>
+                    </div>
+                    <div className="flex-1">
+                      <p className="text-sm font-medium text-muted">Generating Recommended Models</p>
+                      <p className="text-xs text-muted/70">Awaiting extraction completion.</p>
+                    </div>
+                  </div>
+                ) : (
+                  <div className="flex items-center gap-4 p-3 rounded-lg bg-surface/30 border border-border/10">
+                    <div className="w-8 h-8 rounded-full bg-emerald-500/20 text-emerald-400 flex items-center justify-center shrink-0">
+                      <span className="material-symbols-outlined" style={{ fontVariationSettings: "'FILL' 1" }}>check_circle</span>
+                    </div>
+                    <div className="flex-1">
+                      <p className="text-sm font-medium text-text">Models Generated</p>
+                      <p className="text-xs text-muted">Recommended models generated and configured.</p>
+                    </div>
+                  </div>
+                )}
               </div>
             </div>
 
-            {/* Footer Action */}
-            <div className="flex items-center justify-between gap-4 border-t border-border/40 bg-bg/20 px-6 py-4">
-              <p className="hidden text-xs text-muted sm:block">{statusDetail}</p>
-              <button
-                type="button"
-                onClick={() => navigate(`/chronicle/${encodeURIComponent(selectedChronicle.id)}`)}
-                disabled={isProcessing || processLoading}
-                className="ml-auto rounded-full bg-accent px-5 py-2.5 text-sm font-semibold text-bg transition hover:opacity-90 disabled:cursor-not-allowed disabled:opacity-50"
-              >
-                {isProcessing ? 'Processing…' : 'Start Chronicle'}
-              </button>
+            <div className="p-4 bg-bg border-t border-border/20 flex justify-end">
+              {isProcessing ? (
+                <button className="px-6 py-2 rounded-full bg-surface-2 text-muted text-sm font-medium cursor-not-allowed opacity-70 flex items-center gap-2 transition-all" disabled>
+                  <span className="material-symbols-outlined text-[18px]">close</span>
+                  Cancel Processing
+                </button>
+              ) : (
+                <button
+                  type="button"
+                  onClick={() => navigate(`/chronicle/${encodeURIComponent(selectedChronicle.id)}`)}
+                  className="px-6 py-2 rounded-full bg-accent text-bg text-sm font-semibold transition hover:opacity-90 flex items-center gap-2"
+                >
+                  <span className="material-symbols-outlined text-[18px]">play_arrow</span>
+                  Start Chronicle
+                </button>
+              )}
             </div>
+
+            <button
+              type="button"
+              onClick={() => {
+                setSelectedChronicle(null);
+                setProcessStatus(null);
+              }}
+              className="absolute top-4 right-4 z-20 rounded-full p-2 text-muted transition-colors hover:bg-bg/40 hover:text-text"
+              aria-label="Close"
+            >
+              <svg className="h-5 w-5" fill="none" viewBox="0 0 24 24" strokeWidth="2" stroke="currentColor">
+                <path strokeLinecap="round" strokeLinejoin="round" d="M6 18L18 6M6 6l12 12" />
+              </svg>
+            </button>
 
           </div>
         </div>
