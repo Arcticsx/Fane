@@ -1,5 +1,6 @@
 from datetime import datetime, timedelta, timezone
 from pathlib import Path
+import sys
 
 from Backend.App.models.rpg_sessions import ProcessStatus
 from ..services.documents.documents import create_source_document
@@ -48,6 +49,7 @@ async def create_story_document(
     }
 
 
+
 @router.get("/{id}/docs/{doc_id}/status")
 async def get_document_status(
     id: str,
@@ -58,9 +60,27 @@ async def get_document_status(
         SourceDocument.session_id == id,
         SourceDocument.id == doc_id
     ).first()
+
     if not doc:
         raise HTTPException(status_code=404, detail="Document not found")
+    
+    print(f"[get_document_status] Checking status for document {doc_id} in session {id}: {doc.status}, last heartbeat: {doc.last_heartbeat}", file=sys.stderr)
+    print(f"[get_document_status] Current time: {datetime.utcnow()}", file=sys.stderr)
 
+    if (
+        doc.status == "processing"
+        and doc.last_heartbeat
+        and datetime.utcnow() - doc.last_heartbeat > timedelta(minutes=5)
+    ):
+        doc.status = "failed"
+        doc.error_message = "Server crashed"
+        doc.processing_completed_at = datetime.utcnow()
+
+        for process_status in db.query(ProcessStatus).filter_by(session_id=id):
+            if process_status.status == "processing":
+                process_status.status = "failed"
+
+        db.commit()
 
     return {
         "source_document_id": doc.id,

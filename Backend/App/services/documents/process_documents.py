@@ -21,7 +21,7 @@ def _heartbeat_loop(session_id, stop_event, interval_seconds=5):
                     .first()
                 )
                 if source_doc:
-                    source_doc.last_heartbeat = datetime.now(timezone.utc)
+                    source_doc.last_heartbeat = datetime.utcnow()
                     db.commit()
         except Exception as e:
             print(f"[heartbeat] Failed to update heartbeat for session {session_id}: {e}", file=sys.stderr)

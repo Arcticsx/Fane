@@ -189,12 +189,23 @@ export default function ChronicleSelector() {
   const hasProcessData = Array.isArray(processStatus?.phases) && processStatus.phases.length > 0;
   const completedSteps = activePhase?.steps?.filter((step) => step.status === 'completed').length || 0;
   const totalSteps = activePhase?.steps?.length || 0;
-  const progressPercent = hasProcessData && totalSteps > 0 ? Math.round((completedSteps / totalSteps) * 100) : 0;
+  const phaseProgressPercent = hasProcessData && totalSteps > 0 ? Math.round((completedSteps / totalSteps) * 100) : 0;
+
+  const allCompletedSteps = processStatus?.phases?.reduce((sum, phase) =>
+    sum + (phase.steps?.filter(step => step.status === 'completed').length || 0), 0) || 0;
+  const allTotalSteps = processStatus?.phases?.reduce((sum, phase) =>
+    sum + (phase.steps?.length || 0), 0) || 0;
+  const stepBasedProgress = hasProcessData && allTotalSteps > 0
+    ? Math.round((allCompletedSteps / allTotalSteps) * 100) : null;
+  const phaseBasedProgress = hasProcessData && processStatus.total_phases > 0
+    ? Math.round((processStatus.completed_phases / processStatus.total_phases) * 100) : 0;
+  const overallProgressPercent = stepBasedProgress ?? phaseBasedProgress;
   const setupStatus = normalizeStatusValue(selectedChronicle?.setup_status);
   const phaseStatus = normalizeStatusValue(activePhase?.status);
   const stepStatus = normalizeStatusValue(activeStep?.status);
   const activeStatusValues = ['processing', 'in progress', 'started', 'queued'];
   const docStatus = selectedChronicle ? documentStatuses[selectedChronicle.id]?.status : null;
+
   const hasFailed = (docStatus === 'failed') || (
     hasProcessData && (
       processStatus?.phases?.some(
@@ -322,6 +333,8 @@ export default function ChronicleSelector() {
     });
     setProcessLoading(true);
   };
+
+
 
   return (
     <main className="flex h-full flex-col overflow-hidden px-6 pb-6 pt-0 text-text">
@@ -561,17 +574,24 @@ export default function ChronicleSelector() {
             <div className="p-6 flex flex-col gap-6 bg-surface/50">
               <div className="flex flex-col gap-3">
                 <div className="flex justify-between items-end">
-                  <h2 className="text-xl font-semibold text-text">Overall Status</h2>
-                  {isProcessing ? (
-                    <span className="text-sm font-bold text-accent">{progressPercent}%</span>
-                  ) : (
-                    <span className="rounded-full bg-emerald-500/10 px-2.5 py-0.5 text-xs font-medium text-emerald-400">Ready</span>
-                  )}
+                  <h2 className="text-xl font-semibold text-text">Overall Progress</h2>
                 </div>
-                <div className="h-2 w-full bg-surface-2 rounded-full overflow-hidden">
+                <div className="h-2 w-full rounded-full overflow-hidden border border-border/30 bg-bg/40">
                   <div
-                    className={`h-full bg-gradient-to-r from-accent2 to-accent rounded-full ${isProcessing ? 'progress-glow animate-pulse-glow' : ''}`}
-                    style={{ width: isProcessing ? `${progressPercent}%` : '100%' }}
+                    className={`h-full bg-accent rounded-full ${isProcessing ? 'progress-glow animate-pulse-glow' : ''}`}
+                    style={{ width: `${overallProgressPercent}%` }}
+                  />
+                </div>
+
+                <div className="flex justify-between items-end mt-3">
+                  <h2 className="text-sm font-medium text-muted">
+                    Phase: {activePhase?.phase || (hasProcessData ? '—' : 'Awaiting')}
+                  </h2>
+                </div>
+                <div className="h-1.5 w-full rounded-full overflow-hidden border border-border/30 bg-bg/40">
+                  <div
+                    className="h-full bg-accent rounded-full"
+                    style={{ width: `${phaseProgressPercent}%` }}
                   />
                 </div>
               </div>
