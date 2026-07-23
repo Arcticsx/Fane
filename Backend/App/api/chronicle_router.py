@@ -428,8 +428,6 @@ async def retry_chronicle_processing(
         if not file_path or not os.path.exists(file_path):
             continue
         
-        source_doc.status = "processing"
-        db.commit()
         background_tasks.add_task(
             process_document,
             source_doc_id=source_doc.id,

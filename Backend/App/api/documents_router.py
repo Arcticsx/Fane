@@ -1,4 +1,4 @@
-from datetime import datetime, timezone
+from datetime import datetime, timedelta, timezone
 from pathlib import Path
 
 from Backend.App.models.rpg_sessions import ProcessStatus
@@ -61,20 +61,6 @@ async def get_document_status(
     if not doc:
         raise HTTPException(status_code=404, detail="Document not found")
 
-    if doc.status == "processing":
-        heartbeat_deadline = (
-            doc.last_heartbeat.timestamp() + 300
-            if doc.last_heartbeat else 0
-        )
-        if datetime.now(timezone.utc).timestamp() > heartbeat_deadline:
-            doc.status = "failed"
-            doc.error_message = "Server crashed"
-            doc.processing_completed_at = datetime.now(timezone.utc)
-            process_status = db.query(ProcessStatus).filter(ProcessStatus.session_id == id).all()
-            for status in process_status:
-                if status.status == "processing":
-                    status.status = "failed"
-            db.commit()
 
     return {
         "source_document_id": doc.id,

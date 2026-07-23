@@ -42,13 +42,18 @@ def process_document(
 
     try:
         with get_db() as db:
-            source_doc = db.query(SourceDocument).filter(SourceDocument.id == source_doc_id).first()
-            if source_doc:
-                source_doc.processing_started_at = datetime.now(timezone.utc)
-                source_doc.last_heartbeat = datetime.now(timezone.utc)
-                source_doc.status = "processing"
-                db.commit()
+            source_doc = db.get(SourceDocument, source_doc_id)
 
+            source_doc.processing_started_at = datetime.now(timezone.utc)
+            source_doc.last_heartbeat = datetime.now(timezone.utc)
+            source_doc.status = "processing"
+            source_doc.error_message = None
+
+            db.commit()
+            db.refresh(source_doc)
+
+            print(source_doc.status)
+            
         init_pipeline_phases(db, session_id)
 
         heartbeat_thread.start()

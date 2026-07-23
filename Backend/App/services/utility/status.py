@@ -51,11 +51,25 @@ def init_pipeline_phases(db, session_id):
         row.phase for row in
         db.query(ProcessStatus.phase).filter_by(session_id=session_id).all()
     }
+
     for phase, order in PIPELINE_PHASES:
-        if phase not in existing_phases:
-            ps = ProcessStatus(session_id=session_id, phase=phase, status="pending")
+        ps = db.query(ProcessStatus).filter_by(
+            session_id=session_id,
+            phase=phase
+        ).first()
+
+        if ps:
+            if ps.status == "failed":
+                ps.status = "pending"
+        else:
+            ps = ProcessStatus(
+                session_id=session_id,
+                phase=phase,
+                status="pending"
+            )
             db.add(ps)
             db.flush()
+
             if phase not in PHASE_STEPS:
                 db.add(ProcessStep(
                     session_id=session_id,
@@ -67,15 +81,27 @@ def init_pipeline_phases(db, session_id):
                 ))
 
     for phase, steps in PHASE_STEPS.items():
-        ps = db.query(ProcessStatus).filter_by(session_id=session_id, phase=phase).first()
+        ps = db.query(ProcessStatus).filter_by(
+            session_id=session_id,
+            phase=phase
+        ).first()
+
         if not ps:
             continue
-        existing_step_names = {
-            row.step for row in
-            db.query(ProcessStep.step).filter_by(session_id=session_id, phase=phase).all()
+
+        existing_steps = {
+            step.step: step
+            for step in db.query(ProcessStep).filter_by(
+                session_id=session_id,
+                phase=phase
+            ).all()
         }
+
         for step_name, step_order in steps:
-            if step_name not in existing_step_names:
+            if step_name in existing_steps:
+                if existing_steps[step_name].status == "failed":
+                    existing_steps[step_name].status = "pending"
+            else:
                 db.add(ProcessStep(
                     session_id=session_id,
                     phase=phase,
@@ -86,7 +112,6 @@ def init_pipeline_phases(db, session_id):
                 ))
 
     db.commit()
-
 
 def get_next_pending_step(db, session_id):
     step = db.query(ProcessStep).filter(
