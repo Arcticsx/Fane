@@ -14,8 +14,29 @@ import themes from './themes';
 function AppContent() {
   const navigate = useNavigate();
   const location = useLocation();
-  const [selectedThemeId, setSelectedThemeId] = React.useState('purpur');
-  const [customBackgroundUrl, setCustomBackgroundUrl] = React.useState('');
+  const [selectedThemeId, setSelectedThemeId] = React.useState(() => {
+    try {
+      return localStorage.getItem('appTheme') || 'purpur';
+    } catch (e) {
+      return 'purpur';
+    }
+  });
+  const [customBackgroundUrl, setCustomBackgroundUrl] = React.useState(() => {
+    try {
+      return localStorage.getItem('appCustomBackgroundUrl') || '';
+    } catch (e) {
+      return '';
+    }
+  });
+
+  const [gradientEnabled, setGradientEnabled] = React.useState(() => {
+    try {
+      const stored = localStorage.getItem('appGradientEnabled');
+      return stored === null ? true : stored === 'true';
+    } catch (e) {
+      return true;
+    }
+  });
 
   const [themeList, setThemeList] = React.useState(() => {
     try {
@@ -34,15 +55,12 @@ function AppContent() {
     : themeList.find((theme) => theme.id === (previewThemeId || selectedThemeId)) || themeList[0];
 
   React.useEffect(() => {
-    const storedThemeId = localStorage.getItem('appTheme') || 'purpur';
-    const storedBackground = localStorage.getItem('appCustomBackgroundUrl') || '';
-    setSelectedThemeId(storedThemeId);
-    setCustomBackgroundUrl(storedBackground);
-  }, []);
-
-  React.useEffect(() => {
     localStorage.setItem('appTheme', selectedThemeId);
   }, [selectedThemeId]);
+
+  React.useEffect(() => {
+    localStorage.setItem('appGradientEnabled', String(gradientEnabled));
+  }, [gradientEnabled]);
 
   React.useEffect(() => {
     try {
@@ -168,7 +186,9 @@ function AppContent() {
           backgroundPosition: 'center',
           backgroundRepeat: 'no-repeat',
         }
-      : { background: currentTheme.background }),
+      : gradientEnabled
+        ? { background: currentTheme.background }
+        : { backgroundColor: currentTheme.bgColor }),
   };
 
   return (
@@ -181,6 +201,8 @@ function AppContent() {
               onPersonaSelected={handlePersonaSelected}
               selectedThemeId={selectedThemeId}
               customBackgroundUrl={customBackgroundUrl}
+              gradientEnabled={gradientEnabled}
+              onToggleGradient={() => setGradientEnabled((prev) => !prev)}
               themes={themeList}
               onSelectTheme={handleSelectTheme}
               onCreateCustomTheme={handleCreateCustomTheme}

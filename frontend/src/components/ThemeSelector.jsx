@@ -1,6 +1,7 @@
 import React from 'react';
+import { CircleCheck, CircleX } from 'lucide-react';
 
-function ThemeSelector({ themes = [], selectedThemeId, onSelectTheme, onUploadBackground, customBackgroundUrl, onClearCustomBackground, onCreateCustomTheme, onHoverPreview, onHoverPreviewEnd, onDeleteTheme, onUpdateTheme }) {
+function ThemeSelector({ themes = [], selectedThemeId, gradientEnabled, onToggleGradient, onSelectTheme, onUploadBackground, customBackgroundUrl, onClearCustomBackground, onCreateCustomTheme, onHoverPreview, onHoverPreviewEnd, onDeleteTheme, onUpdateTheme }) {
   const [custom, setCustom] = React.useState({
     name: '',
     description: '',
@@ -125,7 +126,34 @@ function ThemeSelector({ themes = [], selectedThemeId, onSelectTheme, onUploadBa
         ))}
       </div>
 
-      
+
+      <div className="mt-5 rounded-3xl border border-border/60 bg-surface/80 p-4">
+        <div className="flex items-center justify-between">
+          <div className="flex w-full items-center gap-2 justify-between">
+            <div>
+              <div className="text-sm font-medium text-text">Background Gradient</div>
+              <p className="text-xs text-muted">Toggle the gradient effect on the background</p>
+            </div>
+            <button
+              type="button"
+              aria-pressed={gradientEnabled}
+              aria-label={gradientEnabled ? 'Disable background gradient' : 'Enable background gradient'}
+              onClick={onToggleGradient}
+              className={`flex h-8 w-8 shrink-0 items-center justify-center rounded-full transition-colors duration-200 ${
+                gradientEnabled
+                  ? 'bg-accent text-white'
+                  : 'bg-surface-2 text-muted hover:bg-surface-2/70'
+              }`}
+            >
+              {gradientEnabled ? (
+                <CircleCheck className="h-4 w-4" />
+              ) : (
+                <CircleX className="h-4 w-4" />
+              )}
+            </button>
+          </div>
+        </div>
+      </div>
 
       <div className="mt-5 rounded-3xl border border-border/60 bg-surface/80 p-4">
         <label className="flex cursor-pointer items-center justify-between gap-3 rounded-3xl border border-dashed border-border/60 bg-surface/80 px-4 py-3 text-sm text-text transition hover:border-accent/70 hover:bg-surface/90">

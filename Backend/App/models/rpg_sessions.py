@@ -51,7 +51,7 @@ class RpgSession(Base):
         "Character", back_populates="session", cascade="all, delete-orphan"
     )
     lore_entries = relationship(
-        "LoreEntry", back_populates="session", cascade="all, delete-orphan"
+        "LoreEntity", back_populates="session", cascade="all, delete-orphan"
     )
     story_beats = relationship(
         "StoryBeat", back_populates="session", cascade="all, delete-orphan"
@@ -70,6 +70,11 @@ class RpgSession(Base):
     )
     process_statuses = relationship(
         "ProcessStatus", back_populates="session", cascade="all, delete-orphan"
+    )
+    entities = relationship(
+        "Entities",
+        back_populates="session",
+        cascade="all, delete-orphan",
     )
 
     def __repr__(self) -> str:
@@ -134,9 +139,10 @@ class SourceDocument(Base):
     # --- Relationships ---
     session = relationship("RpgSession", back_populates="source_documents")
     characters = relationship("Character", back_populates="source_document")
-    lore_entries = relationship("LoreEntry", back_populates="source_document")
+    lore_entries = relationship("LoreEntity", back_populates="source_document")
     story_beats = relationship("StoryBeat", back_populates="source_document")
     story_events = relationship("StoryEvent", back_populates="source_document")
+    entities = relationship("Entities", back_populates="source_document", cascade="all, delete-orphan")
 
     def __repr__(self) -> str:
         return f"<SourceDocument id={self.id!r} filename={self.filename!r} status={self.status!r}>"
@@ -267,6 +273,9 @@ class LoreEntity(Base):
     total_pages = Column(Integer, default=0)
     num_chapters_present = Column(Integer, default=0)
 
+    session = relationship("RpgSession", back_populates="lore_entries")
+    source_document = relationship("SourceDocument", back_populates="lore_entries")
+    
     spans = relationship("LoreSpan", back_populates="entity", cascade="all, delete-orphan", order_by="LoreSpan.chapter_number")
     segments = relationship("LoreSegment", back_populates="entity", cascade="all, delete-orphan", order_by="LoreSegment.segment_number")
     states = relationship("LoreState", back_populates="entity", cascade="all, delete-orphan")

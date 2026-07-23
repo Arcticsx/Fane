@@ -11,6 +11,8 @@ function PersonalitySelector({
   onPersonaSelected,
   selectedThemeId,
   customBackgroundUrl,
+  gradientEnabled,
+  onToggleGradient,
   onSelectTheme,
   onUploadBackground,
   onClearCustomBackground,
@@ -288,8 +290,10 @@ function PersonalitySelector({
           <div className="rounded-2xl border border-border/20 bg-surface/40 p-5 backdrop-blur-md shadow-lg">
             <div className="mb-5 flex items-center justify-between">
               <h2 className="text-lg font-bold text-accent flex items-center gap-2">
-                <span className="material-symbols-outlined">auto_stories</span>
-                Chronicles
+                <span className="material-symbols-outlined text-3xl">
+                    cruelty_free
+                </span>
+                <span>Chronicle</span>
               </h2>
             </div>
 
@@ -299,9 +303,13 @@ function PersonalitySelector({
                 Loading chronicles…
               </div>
             ) : filteredChronicles.length === 0 ? (
-              <div className="rounded-xl border border-dashed border-border/50 bg-surface/30 px-6 py-12 text-center text-muted/80">
-                <span className="material-symbols-outlined text-3xl mb-2 block">auto_stories</span>
-                No chronicles yet. Create your first story.
+              <div className="flex items-center justify-center">
+                <div className="flex flex-row items-center  gap-2">
+                  <span className="material-symbols-outlined text-3xl">
+                    cruelty_free
+                  </span>
+                  <span>No chronicles yet. Create your first story.</span>
+                </div>
               </div>
             ) : (
               <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4">
@@ -371,10 +379,14 @@ function PersonalitySelector({
                 Loading personalities…
               </div>
             ) : filteredList.length === 0 ? (
-              <div className="rounded-2xl border border-dashed border-border/50 bg-surface/30 px-6 py-16 text-center text-muted/80">
-                <span className="material-symbols-outlined text-3xl mb-2 block">person_off</span>
-                No personalities found. Create your first persona.
+
+              <div className="flex items-center justify-center w-full">
+                <div className="rounded-2xl w-full border border-dashed border-border/50 bg-surface/30 px-6 py-16 text-center text-muted/80 flex flex-row items-center justify-center gap-3">
+                  <span className="material-symbols-outlined text-3xl">person_off</span>
+                  <span>No personalities found. Create your first persona.</span>
+                </div>
               </div>
+              
             ) : (
               <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4">
                 {filteredList.map((persona) => (
@@ -440,6 +452,8 @@ function PersonalitySelector({
           themes={themes}
           selectedThemeId={selectedThemeId}
           customBackgroundUrl={customBackgroundUrl}
+          gradientEnabled={gradientEnabled}
+          onToggleGradient={onToggleGradient}
           onSelectTheme={onSelectTheme}
           onUploadBackground={onUploadBackground}
           onClearCustomBackground={onClearCustomBackground}
