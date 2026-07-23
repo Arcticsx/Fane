@@ -140,7 +140,6 @@ def _step_vector_storage(source_doc_id: str, session_id: str, temp_path: str, fi
             source_doc = db.query(SourceDocument).filter(SourceDocument.id == source_doc_id).first()
             if source_doc and isinstance(result, dict) and "chunks_saved" in result:
                 source_doc.chunk_count = result["chunks_saved"]
-                source_doc.status = "ready"
                 db.commit()
 
         with get_db() as db:

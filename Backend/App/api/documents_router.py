@@ -1,6 +1,7 @@
-import os
 from datetime import datetime, timezone
 from pathlib import Path
+
+from Backend.App.models.rpg_sessions import ProcessStatus
 from ..services.documents.documents import create_source_document
 from fastapi import APIRouter, BackgroundTasks, Depends, File, HTTPException, UploadFile, logger
 from sqlalchemy.orm import Session
@@ -69,6 +70,10 @@ async def get_document_status(
             doc.status = "failed"
             doc.error_message = "Server crashed"
             doc.processing_completed_at = datetime.now(timezone.utc)
+            process_status = db.query(ProcessStatus).filter(ProcessStatus.session_id == id).all()
+            for status in process_status:
+                if status.status == "processing":
+                    status.status = "failed"
             db.commit()
 
     return {
@@ -79,50 +84,4 @@ async def get_document_status(
     }
 
 
-@router.post("/{id}/docs/{doc_id}/retry")
-async def retry_document_processing(
-    id: str,
-    doc_id: str,
-    db: Session = Depends(get_db_session),
-    background_tasks: BackgroundTasks = BackgroundTasks(),
-):
-    source_doc = db.query(SourceDocument).filter(
-        SourceDocument.session_id == id,
-        SourceDocument.id == doc_id,
-    ).first()
 
-    if not source_doc:
-        raise HTTPException(status_code=404, detail="Document not found")
-
-    if source_doc.status == "completed":
-        return {
-            "status": "already_completed",
-            "source_document_id": source_doc.id,
-            "message": "Document processing is already complete.",
-        }
-
-    if source_doc.status not in ("failed", "pending", "processing"):
-        return {
-            "status": source_doc.status,
-            "source_document_id": source_doc.id,
-            "message": f"Document is in state '{source_doc.status}'. Only failed/pending/processing documents can be retried.",
-        }
-
-    file_path = source_doc.file_path
-    if not file_path or not os.path.exists(file_path):
-        raise HTTPException(status_code=400, detail="Source file no longer exists on disk. Re-upload required.")
-
-    background_tasks.add_task(
-        process_document,
-        source_doc_id=source_doc.id,
-        session_id=id,
-        temp_path=file_path,
-        filename=source_doc.filename,
-    )
-
-    return {
-        "status": "retrying",
-        "source_document_id": source_doc.id,
-        "session_id": id,
-        "message": "Document processing has been re-queued.",
-    }

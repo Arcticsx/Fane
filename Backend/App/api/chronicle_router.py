@@ -1,3 +1,4 @@
+import os
 import re
 import shutil
 import uuid
@@ -5,7 +6,7 @@ from datetime import datetime, timezone
 from pathlib import Path
 from typing import Optional
 
-from fastapi import APIRouter, Depends, File, Form, HTTPException, UploadFile
+from fastapi import APIRouter, BackgroundTasks, Depends, File, Form, HTTPException, UploadFile
 from pydantic import BaseModel
 from sqlalchemy.orm import Session
 
@@ -25,6 +26,7 @@ from ..models.rpg_sessions import (
 )
 from ..services.utility.response import get_response
 from ..services.documents.vectorstore import query_chroma_for_lore
+from ..services.documents.process_documents import process_document
 from ..services.utility.config import DATA_DIR
 
 router = APIRouter(prefix="/story", tags=["chronicle"])
@@ -39,9 +41,16 @@ async def list_sessions(db: Session = Depends(get_db_session)):
         .order_by(RpgSession.created_at.desc())
         .all()
     )
+    doc_map = {}
+    if sessions:
+        docs = db.query(SourceDocument).filter(
+            SourceDocument.session_id.in_([s.id for s in sessions])
+        ).all()
+        doc_map = {d.session_id: d.id for d in docs}
     return [
         {
             "id": session.id,
+            "doc_id": doc_map.get(session.id),
             "title": session.title,
             "synopsis": session.synopsis,
             "genre": session.genre,
@@ -59,8 +68,11 @@ async def get_session(session_id: str, db: Session = Depends(get_db_session)):
     if not session:
         raise HTTPException(status_code=404, detail="Session not found")
 
+    doc = db.query(SourceDocument).filter(SourceDocument.session_id == session_id).first()
+
     return {
         "id": session.id,
+        "doc_id": doc.id if doc else None,
         "title": session.title,
         "synopsis": session.synopsis,
         "genre": session.genre,
@@ -384,4 +396,66 @@ async def get_process_status(session_id: str, db: Session = Depends(get_db_sessi
         "total_phases": len(phase_list),
         "completed_phases": completed_phases,
         "phases": phase_list,
+    }
+
+
+@router.post("/{session_id}/retry")
+async def retry_chronicle_processing(
+    session_id: str,
+    db: Session = Depends(get_db_session),
+    background_tasks: BackgroundTasks = BackgroundTasks(),
+):
+    session = db.query(RpgSession).filter(RpgSession.id == session_id).first()
+    if not session:
+        raise HTTPException(status_code=404, detail="Session not found")
+
+    failed_docs = (
+        db.query(SourceDocument)
+        .filter(
+            SourceDocument.session_id == session_id,
+            SourceDocument.status == "failed",
+        )
+        .all()
+    )
+
+    if not failed_docs:
+        return {"status": "nothing_to_retry", "retried_count": 0}
+
+    retried_count = 0
+    for source_doc in failed_docs:
+        file_path = source_doc.file_path
+        
+        if not file_path or not os.path.exists(file_path):
+            continue
+        
+        source_doc.status = "processing"
+        db.commit()
+        background_tasks.add_task(
+            process_document,
+            source_doc_id=source_doc.id,
+            session_id=session_id,
+            temp_path=file_path,
+            filename=source_doc.filename,
+        )
+        retried_count += 1
+
+    failed_phases = (
+        db.query(ProcessStatus)
+        .filter(
+            ProcessStatus.session_id == session_id,
+            ProcessStatus.status == "failed",
+        )
+        .all()
+    )
+    for phase in failed_phases:
+        phase.status = "pending"
+        phase.error = None
+        phase.started_at = None
+        phase.completed_at = None
+    db.commit()
+
+    return {
+        "status": "retrying",
+        "retried_count": retried_count,
+        "message": f"{retried_count} document(s) re-queued for processing.",
     }

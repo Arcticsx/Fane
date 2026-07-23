@@ -205,6 +205,11 @@ export const api = {
     const res = await fetch(`${API_BASE}/story/${sessionId}/process-status`);
     return handleResponse(res);
   },
+
+  async retryChronicleProcessing(sessionId) {
+    const res = await fetch(`${API_BASE}/story/${sessionId}/retry`, { method: 'POST' });
+    return handleResponse(res);
+  },
   // Chronicle helpers
   async listChronicles() {
     const res = await fetch(`${API_BASE}/story`);

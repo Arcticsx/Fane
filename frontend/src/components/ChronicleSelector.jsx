@@ -13,6 +13,8 @@ export default function ChronicleSelector() {
   const [selectedChronicle, setSelectedChronicle] = useState(null);
   const [processStatus, setProcessStatus] = useState(null);
   const [processLoading, setProcessLoading] = useState(false);
+  const [retrying, setRetrying] = useState(false);
+  const [documentStatuses, setDocumentStatuses] = useState({});
   const [editForm, setEditForm] = useState({ title: '', description: '', synopsis: '' });
   const [editSaving, setEditSaving] = useState(false);
   const navigate = useNavigate();
@@ -143,8 +145,28 @@ export default function ChronicleSelector() {
       }
     };
 
+    const loadDocStatus = async () => {
+      try {
+        const chronicle = chronicles.find(c => c.id === selectedChronicle.id);
+        if (chronicle?.doc_id) {
+          const status = await api.getDocumentStatus(selectedChronicle.id, chronicle.doc_id);
+          if (!cancelled) {
+            setDocumentStatuses(prev => ({ ...prev, [selectedChronicle.id]: status }));
+          }
+        }
+      } catch (err) {
+        if (!cancelled) {
+          console.error('Failed to load document status', err);
+        }
+      }
+    };
+
     loadProcessStatus();
-    const interval = window.setInterval(loadProcessStatus, 4000);
+    loadDocStatus();
+    const interval = window.setInterval(() => {
+      loadProcessStatus();
+      loadDocStatus();
+    }, 4000);
     return () => {
       cancelled = true;
       window.clearInterval(interval);
@@ -172,8 +194,21 @@ export default function ChronicleSelector() {
   const phaseStatus = normalizeStatusValue(activePhase?.status);
   const stepStatus = normalizeStatusValue(activeStep?.status);
   const activeStatusValues = ['processing', 'in progress', 'started', 'queued'];
-  const isProcessing = Boolean(
+  const docStatus = selectedChronicle ? documentStatuses[selectedChronicle.id]?.status : null;
+  const hasFailed = (docStatus === 'failed') || (
+    hasProcessData && (
+      processStatus?.phases?.some(
+        p => p.status === 'failed' || p.steps?.some(s => s.status === 'failed')
+      )
+    )
+  );
+  const failedPhase = hasFailed && hasProcessData
+    ? processStatus.phases.find(p => p.status === 'failed' || p.steps?.some(s => s.status === 'failed'))
+    : null;
+  const failedStep = failedPhase?.steps?.find(s => s.status === 'failed') || null;
+  const isProcessing = !hasFailed && Boolean(
     selectedChronicle && (
+      docStatus === 'processing' ||
       activeStatusValues.includes(setupStatus) ||
       activeStatusValues.includes(phaseStatus) ||
       activeStatusValues.includes(stepStatus)
@@ -246,6 +281,46 @@ export default function ChronicleSelector() {
   const openChronicle = (chronicle) => {
     setSelectedChronicle(chronicle);
     setProcessStatus(null);
+  };
+
+  const handleRetry = async () => {
+    if (!selectedChronicle?.id || retrying) return;
+    setRetrying(true);
+    try {
+      await api.retryChronicleProcessing(selectedChronicle.id);
+
+      const [status, docStatusResult] = await Promise.all([
+        api.getChronicleProcessStatus(selectedChronicle.id),
+        (async () => {
+          const c = chronicles.find(x => x.id === selectedChronicle.id);
+          if (c?.doc_id) {
+            return api.getDocumentStatus(selectedChronicle.id, c.doc_id);
+          }
+          return null;
+        })(),
+      ]);
+
+      setProcessStatus(status);
+      if (docStatusResult) {
+        setDocumentStatuses(prev => ({ ...prev, [selectedChronicle.id]: docStatusResult }));
+      }
+    } catch (err) {
+      console.error('Retry failed', err);
+      alert('Retry failed: ' + (err.message || err));
+    } finally {
+      setRetrying(false);
+    }
+  };
+
+  const handleCancelProcessing = () => {
+    if (!selectedChronicle?.id) return;
+    setProcessStatus(null);
+    setDocumentStatuses(prev => {
+      const next = { ...prev };
+      delete next[selectedChronicle.id];
+      return next;
+    });
+    setProcessLoading(true);
   };
 
   return (
@@ -390,8 +465,17 @@ export default function ChronicleSelector() {
                       <div className="min-h-0 flex-1">
                         <div className="flex items-center justify-between gap-2">
                           <h3 className="truncate text-base font-semibold text-text">{chronicle.title}</h3>
-                          <span className="rounded-full border border-accent/30 bg-accent/10 px-2 py-0.5 text-[10px] uppercase tracking-[0.2em] text-accent">
-                            {chronicle.setup_status || 'ready'}
+                          <span className={`rounded-full border px-2 py-0.5 text-[10px] uppercase tracking-[0.2em] ${
+                            documentStatuses[chronicle.id]?.status === 'completed'
+                              ? 'border-emerald-500/30 bg-emerald-500/10 text-emerald-400'
+                              : documentStatuses[chronicle.id]?.status === 'failed'
+                              ? 'border-accent2/30 bg-accent2/10 text-accent2'
+                              : 'border-accent/30 bg-accent/10 text-accent'
+                          }`}>
+                            {documentStatuses[chronicle.id]?.status === 'completed' ? 'Ready'
+                              : documentStatuses[chronicle.id]?.status === 'failed' ? 'Failed'
+                              : documentStatuses[chronicle.id]?.status === 'processing' ? 'Processing'
+                              : chronicle.setup_status || 'Ready'}
                           </span>
                         </div>
                         <p className="mt-1 text-sm text-muted line-clamp-2 break-words">{chronicle.synopsis || 'No description available.'}</p>
@@ -503,7 +587,21 @@ export default function ChronicleSelector() {
                   </div>
                 </div>
 
-                {isProcessing ? (
+                {hasFailed ? (
+                  <div className="flex items-center gap-4 p-3 rounded-lg bg-accent2/10 border border-accent2/30">
+                    <div className="w-8 h-8 rounded-full bg-accent2/20 text-accent2 flex items-center justify-center shrink-0">
+                      <span className="material-symbols-outlined" style={{ fontVariationSettings: "'FILL' 1" }}>close</span>
+                    </div>
+                    <div className="flex-1">
+                      <p className="text-sm font-bold text-accent2">
+                        {failedPhase?.phase || failedStep?.step || 'Processing Failed'}
+                      </p>
+                      <p className="text-xs text-accent2/80">
+                        {failedStep?.error || failedPhase?.error || docStatus === 'failed' && documentStatuses[selectedChronicle.id]?.error_message || 'An error occurred during processing.'}
+                      </p>
+                    </div>
+                  </div>
+                ) : isProcessing ? (
                   activePhase ? (
                     <div className="flex items-center gap-4 p-3 rounded-lg bg-accent/10 border border-accent/30 relative overflow-hidden">
                       <div className="absolute inset-0 bg-gradient-to-r from-transparent via-accent/5 to-transparent animate-pulse" />
@@ -563,8 +661,22 @@ export default function ChronicleSelector() {
             </div>
 
             <div className="p-4 bg-bg border-t border-border/20 flex justify-end">
-              {isProcessing ? (
-                <button className="px-6 py-2 rounded-full bg-surface-2 text-muted text-sm font-medium cursor-not-allowed opacity-70 flex items-center gap-2 transition-all" disabled>
+              {hasFailed ? (
+                <button
+                  type="button"
+                  onClick={handleRetry}
+                  disabled={retrying}
+                  className="px-6 py-2 rounded-full bg-accent2 text-bg text-sm font-semibold transition hover:opacity-90 flex items-center gap-2 disabled:opacity-50"
+                >
+                  <span className="material-symbols-outlined text-[18px]">{retrying ? 'hourglass_top' : 'restart_alt'}</span>
+                  {retrying ? 'Retrying…' : 'Retry'}
+                </button>
+              ) : isProcessing ? (
+                <button
+                  type="button"
+                  onClick={handleCancelProcessing}
+                  className="px-6 py-2 rounded-full border border-accent2/40 bg-accent2/10 text-accent2 text-sm font-semibold transition hover:bg-accent2/20 hover:border-accent2/60 flex items-center gap-2"
+                >
                   <span className="material-symbols-outlined text-[18px]">close</span>
                   Cancel Processing
                 </button>
