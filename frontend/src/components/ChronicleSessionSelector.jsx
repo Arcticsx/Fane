@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { api } from '../api';
+import { api, getImageUrl } from '../api';
 import ConfirmModal from './ConfirmModal.jsx';
 
 export default function ChronicleSessionSelector() {
@@ -150,6 +150,15 @@ export default function ChronicleSessionSelector() {
                       <div className="absolute inset-0 rounded-2xl bg-gradient-to-br from-accent/10 to-transparent opacity-0 transition-opacity group-hover:opacity-100 pointer-events-none" />
                       <div className="relative flex flex-col h-full">
                         <div className="flex items-start justify-between gap-3">
+                          <div className="h-10 w-10 shrink-0 overflow-hidden rounded-full bg-gradient-to-br from-accent2 to-accent">
+                            {chronicle.avatar ? (
+                              <img src={getImageUrl(chronicle.avatar)} alt={chronicle.title} className="h-full w-full object-cover" />
+                            ) : (
+                              <div className="flex h-full w-full items-center justify-center text-sm font-semibold text-text">
+                                {(chronicle.title || 'C').charAt(0).toUpperCase()}
+                              </div>
+                            )}
+                          </div>
                           <div className="flex-1 min-w-0">
                             <h3 className="text-base font-semibold text-text truncate">{chronicle.title}</h3>
                             <p className="mt-1 text-sm text-muted line-clamp-2">{chronicle.setup_status || 'No status'}</p>

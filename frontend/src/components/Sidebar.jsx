@@ -271,8 +271,14 @@ function Sidebar({ activeView, onViewChange, onCreateClick }) {
                     <div className="absolute left-0 top-1/2 -translate-y-1/2 h-6 w-0.5 bg-accent rounded-r-full shadow-[0_0_10px_rgba(99,102,241,0.5)]" />
                   )}
 
-                  <div className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-gradient-to-br from-accent2 to-accent text-sm font-semibold text-text">
-                    {(item.title || 'C').charAt(0).toUpperCase()}
+                  <div className="h-8 w-8 shrink-0 overflow-hidden rounded-full bg-gradient-to-br from-accent2 to-accent">
+                    {item.avatar ? (
+                      <img src={getImageUrl(item.avatar)} alt={item.title} className="h-full w-full object-cover" />
+                    ) : (
+                      <div className="flex h-full w-full items-center justify-center text-sm font-semibold text-text">
+                        {(item.title || 'C').charAt(0).toUpperCase()}
+                      </div>
+                    )}
                   </div>
 
                   <div className="flex min-w-0 flex-1 flex-col gap-0.5">

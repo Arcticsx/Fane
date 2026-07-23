@@ -1,6 +1,6 @@
 import React, { useEffect, useState, useRef } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { api } from '../api';
+import { api, getImageUrl } from '../api';
 import { PlusIcon } from 'lucide-react';
 
 export default function ChronicleChat({ chronicleId, onBack }) {
@@ -121,7 +121,11 @@ export default function ChronicleChat({ chronicleId, onBack }) {
         <div className="mb-4 flex items-center justify-between rounded-2xl border border-border/60 bg-surface/70 px-4 py-3 shadow-lg shadow-surface/20">
           <div className="flex items-center gap-3">
             <div className="h-10 w-10 shrink-0 overflow-hidden rounded-full bg-gradient-to-br from-accent2 to-accent">
-              <div className="flex h-full w-full items-center justify-center text-sm font-semibold text-text">C</div>
+              {chronicle?.avatar ? (
+                <img src={getImageUrl(chronicle.avatar)} alt={chronicle.title} className="h-full w-full object-cover" />
+              ) : (
+                <div className="flex h-full w-full items-center justify-center text-sm font-semibold text-text">C</div>
+              )}
             </div>
             <div>
               <div className="text-base font-semibold text-text">{chronicle?.title || 'Chronicle Chat'}</div>

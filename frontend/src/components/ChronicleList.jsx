@@ -66,6 +66,15 @@ export default function ChronicleList() {
             onClick={() => navigate(`/chronicle/${encodeURIComponent(c.id)}`)}
           >
             <div className="flex items-start justify-between gap-3">
+              <div className="h-10 w-10 shrink-0 overflow-hidden rounded-full bg-gradient-to-br from-accent2 to-accent">
+                {c.avatar ? (
+                  <img src={getImageUrl(c.avatar)} alt={c.title} className="h-full w-full object-cover" />
+                ) : (
+                  <div className="flex h-full w-full items-center justify-center text-sm font-semibold text-text">
+                    {(c.title || 'C').charAt(0).toUpperCase()}
+                  </div>
+                )}
+              </div>
               <div className="flex-1 min-w-0">
                 <h3 className="text-base font-semibold text-text truncate">{c.title}</h3>
                 <p className="mt-1 text-xs text-muted/70">{c.setup_status}</p>

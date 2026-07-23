@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useRef } from 'react';
-import { api } from '../api';
+import { api, getImageUrl } from '../api';
 import { useNavigate } from 'react-router-dom';
 
 export default function ChronicleSelector() {
@@ -366,9 +366,13 @@ export default function ChronicleSelector() {
                     onClick={() => openChronicle(chronicle)}
                   >
                     <div className="h-24 w-24 shrink-0 overflow-hidden rounded-xl bg-gradient-to-br from-accent2 to-accent">
-                      <div className="flex h-full w-full items-center justify-center text-2xl font-semibold text-text">
-                        {chronicle.title?.charAt(0) || 'C'}
-                      </div>
+                      {chronicle.avatar ? (
+                        <img src={getImageUrl(chronicle.avatar)} alt={chronicle.title} className="h-full w-full object-cover" />
+                      ) : (
+                        <div className="flex h-full w-full items-center justify-center text-2xl font-semibold text-text">
+                          {chronicle.title?.charAt(0) || 'C'}
+                        </div>
+                      )}
                     </div>
 
                     <div className="flex h-24 flex-1 flex-col justify-between overflow-hidden">

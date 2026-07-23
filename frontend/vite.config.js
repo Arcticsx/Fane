@@ -15,6 +15,7 @@ export default defineConfig({
       "/sessions": "http://localhost:8000",
       "/chat": "http://localhost:8000",
       "/story": "http://localhost:8000",
+      "/data": "http://localhost:8000",
     },
   },
 });

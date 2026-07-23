@@ -321,9 +321,17 @@ function PersonalitySelector({
                   >
                     {/* Chronicle avatar */}
                     <div className="h-20 w-20 shrink-0 overflow-hidden rounded-xl bg-gradient-to-br from-accent/80 to-accent2/80 shadow-inner">
-                      <div className="flex h-full w-full items-center justify-center text-2xl font-bold text-white/90">
-                        {chronicle.title?.charAt(0) || 'C'}
-                      </div>
+                      {chronicle.avatar ? (
+                        <img
+                          src={getImageUrl(chronicle.avatar)}
+                          alt={chronicle.title}
+                          className="h-full w-full object-cover"
+                        />
+                      ) : (
+                        <div className="flex h-full w-full items-center justify-center text-2xl font-bold text-white/90">
+                          {chronicle.title?.charAt(0) || 'C'}
+                        </div>
+                      )}
                     </div>
 
                     <div className="flex h-20 flex-1 flex-col justify-between overflow-hidden">

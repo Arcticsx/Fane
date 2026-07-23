@@ -146,9 +146,13 @@ function ThemeSelector({ themes = [], selectedThemeId, gradientEnabled, onToggle
               }`}
             >
               {gradientEnabled ? (
-                <CircleCheck className="h-4 w-4" />
+                <span class="material-symbols-outlined">
+                check_box_outline_blank
+                </span>
               ) : (
-                <CircleX className="h-4 w-4" />
+                <span class="material-symbols-outlined">
+                check_box
+                </span>
               )}
             </button>
           </div>
