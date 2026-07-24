@@ -529,7 +529,7 @@ export default function ChronicleSelector() {
           <div className="absolute top-1/4 left-1/4 w-[500px] h-[500px] bg-accent/5 rounded-full blur-[100px] z-0 pointer-events-none" />
           <div className="absolute bottom-1/4 right-1/4 w-[600px] h-[600px] bg-accent2/5 rounded-full blur-[120px] z-0 pointer-events-none" />
 
-          <div className="glass-panel neon-glow relative z-10 w-full max-w-3xl rounded-[24px] overflow-hidden flex flex-col">
+          <div className="glass-panel neon-glow relative z-10 w-full max-w-3xl rounded-[14px] overflow-hidden flex flex-col">
             
             <div className="flex flex-col md:flex-row p-6 gap-6 border-b border-border/30 bg-bg/50">
               <div className="w-full md:w-1/3 shrink-0">
@@ -558,10 +558,10 @@ export default function ChronicleSelector() {
                 <p className="text-sm text-muted leading-relaxed">{selectedChronicle.synopsis || 'No description available.'}</p>
 
                 {selectedGenres.length > 0 && (
-                  <div className="flex flex-wrap gap-2 mt-4">
+                  <div className="flex flex-wrap gap-2 mt-4 select-none cursor-pointer">
                     {selectedGenres.map((genre) => (
                       <div key={genre} className="px-3 py-1 rounded-full bg-surface/80 text-muted text-xs border border-border/20 flex items-center gap-1">
-                        <span className="material-symbols-outlined text-[14px]">{genreIcons[genre] || 'auto_stories'}</span>
+                        {/* <span className="material-symbols-outlined text-[14px]">{genreIcons[genre] || 'auto_stories'}</span> */}
                         {genre}
                       </div>
                     ))}
