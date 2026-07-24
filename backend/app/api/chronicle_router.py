@@ -10,7 +10,7 @@ from fastapi import APIRouter, BackgroundTasks, Depends, File, Form, HTTPExcepti
 from pydantic import BaseModel
 from sqlalchemy.orm import Session
 
-from Backend.App.services.utility.status import PIPELINE_PHASES
+from backend.app.services.utility.status import PIPELINE_PHASES
 
 from ..services.utility.getdb import get_db_session
 from ..models.rpg_sessions import (

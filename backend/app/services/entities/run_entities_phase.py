@@ -1,7 +1,7 @@
 import sys
 import time
 
-from Backend.App.services.entities.process_lore import classify_lore, persist_lore, persist_lore_in_chapter, persist_lore_segments
+from .process_lore import classify_lore, persist_lore, persist_lore_in_chapter, persist_lore_segments
 
 from ..utility.getdb import get_db
 from ..utility.response import get_response

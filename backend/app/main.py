@@ -16,11 +16,11 @@ for path in (str(REPO_ROOT), str(BACKEND_DIR), str(APP_DIR), str(APP_DIR / "api"
         sys.path.insert(0, path)
 
 if __package__ in {None, ""}:
-    from Backend.app.api.chat_router import app
+    from backend.app.api.chat_router import app
 else:
     from .api.chat_router import app
 
 import uvicorn
 
 if __name__ == '__main__':
-    uvicorn.run("Backend.app.api.chat_router:app", host="0.0.0.0", port=8000, reload=True)
+    uvicorn.run("backend.app.api.chat_router:app", host="0.0.0.0", port=8000, reload=True)

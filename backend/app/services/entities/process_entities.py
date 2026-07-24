@@ -1,7 +1,7 @@
 import sys
 import time
 
-from Backend.App.models.rpg_sessions import Entities
+from ...models.rpg_sessions import Entities
 
 from ..utility.response import get_response
 from ..beats.extraction import _assemble_pages_text, _parse_json_response
