@@ -174,7 +174,7 @@ function AppContent() {
     '--color-text': currentTheme.text,
     '--color-muted': currentTheme.muted,
     '--color-accent': currentTheme.accent,
-    '--color-accent-2': currentTheme.accent2,
+    '--color-accent2': currentTheme.accent2,
   };
 
   const rootStyle = {

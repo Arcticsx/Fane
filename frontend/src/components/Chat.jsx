@@ -167,7 +167,7 @@ function Chat({ persona: propPersona, session: propSession, onBack }) {
           border-radius: 3px;
         }
         .scrollbar-themed::-webkit-scrollbar-thumb:hover {
-          background: var(--color-accent-2);
+          background: var(--color-accent2);
         }
         .scrollbar-themed {
           scrollbar-width: thin;

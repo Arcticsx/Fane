@@ -109,7 +109,7 @@ export default function ChronicleChat({ chronicleId, onBack }) {
           border-radius: 3px;
         }
         .scrollbar-themed::-webkit-scrollbar-thumb:hover {
-          background: var(--color-accent-2);
+          background: var(--color-accent2);
         }
         .scrollbar-themed {
           scrollbar-width: thin;

@@ -525,8 +525,7 @@ export default function ChronicleSelector() {
         </section>
 
         {selectedChronicle && (
-        <div className="fixed inset-0 z-[9999] flex items-center justify-center bg-bg/70 p-4 backdrop-blur-sm">
-          <div className="absolute inset-0 bg-gradient-to-br from-bg to-bg z-0 pointer-events-none" />
+        <div className="fixed inset-0 z-[9999] flex items-center justify-center bg-bg/30 backdrop-blur-sm p-4">
           <div className="absolute top-1/4 left-1/4 w-[500px] h-[500px] bg-accent/5 rounded-full blur-[100px] z-0 pointer-events-none" />
           <div className="absolute bottom-1/4 right-1/4 w-[600px] h-[600px] bg-accent2/5 rounded-full blur-[120px] z-0 pointer-events-none" />
 
@@ -575,6 +574,7 @@ export default function ChronicleSelector() {
               <div className="flex flex-col gap-3">
                 <div className="flex justify-between items-end">
                   <h2 className="text-xl font-semibold text-text">Overall Progress</h2>
+                  <span className="text-sm text-muted">{overallProgressPercent}%</span>
                 </div>
                 <div className="h-2 w-full rounded-full overflow-hidden border border-border/30 bg-bg/40">
                   <div
@@ -587,6 +587,7 @@ export default function ChronicleSelector() {
                   <h2 className="text-sm font-medium text-muted">
                     Phase: {activePhase?.phase || (hasProcessData ? '—' : 'Awaiting')}
                   </h2>
+                  <span className="text-sm text-muted">{phaseProgressPercent}%</span>
                 </div>
                 <div className="h-1.5 w-full rounded-full overflow-hidden border border-border/30 bg-bg/40">
                   <div

@@ -1,6 +1,6 @@
 @import "tailwindcss";
 
-:root {
+@theme {
   --color-bg: #08020f;
   --color-surface: #110520;
   --color-surface-2: #1c0a38;
@@ -8,7 +8,10 @@
   --color-text: #f0e8ff;
   --color-muted: #8a70aa;
   --color-accent: #aa00ff;
-  --color-accent-2: #ff00cc;
+  --color-accent2: #ff00cc;
+}
+
+:root {
   --font-sans: 'Arimo', 'Inter', 'Segoe UI', system-ui, sans-serif;
   --font-mono: 'JetBrains Mono', 'Fira Code', monospace;
 }
@@ -76,7 +79,7 @@ button {
 }
 
 ::-webkit-scrollbar-thumb:hover {
-  background: var(--color-accent-2);
+  background: var(--color-accent2);
 }
 
 * {
@@ -112,7 +115,7 @@ button {
 }
 
 .neon-glow {
-  box-shadow: 0 0 15px 0 var(--color-accent-2);
+  box-shadow: 0 0 15px 0 var(--color-accent2);
   border: 1px solid var(--color-accent);
 }
 
