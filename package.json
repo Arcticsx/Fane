@@ -1,6 +1,6 @@
 {
   "scripts": {
-    "backend": "python -m uvicorn Backend.App.main:app --reload",
+    "backend": "python -m uvicorn backend.app.main:app --reload",
     "frontend": "cd frontend && npm run dev",
     "fboth": "npm-run-all --parallel backend frontend",
     "postinstall": "cd frontend && npm install"
