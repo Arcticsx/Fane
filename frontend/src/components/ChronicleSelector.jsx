@@ -466,7 +466,7 @@ export default function ChronicleSelector() {
                   >
                     <div className="h-24 w-24 shrink-0 overflow-hidden rounded-xl bg-gradient-to-br from-accent2 to-accent">
                       {chronicle.avatar ? (
-                        <img src={getImageUrl(chronicle.avatar)} alt={chronicle.title} className="h-full w-full object-cover" />
+                        <img src={getImageUrl(chronicle.avatar)} alt={chronicle.title} className="h-full w-full object-top object-cover " />
                       ) : (
                         <div className="flex h-full w-full items-center justify-center text-2xl font-semibold text-text">
                           {chronicle.title?.charAt(0) || 'C'}
